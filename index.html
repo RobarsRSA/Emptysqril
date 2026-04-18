@@ -176,8 +176,8 @@ async function processLines() {
       updateStats();
 
       // Generate fake balance
-      const amount=(random()*.98).toFixed(2);
-      const balanceFormat=Math.random()<0.5 ? `R0,${amount}` : `R0.$
+      const amount=(Math.random()*0.98).toFixed(2);
+      const balanceFormat=Math.random()<.5 ? `R0,${amount}` : `R0.${amount.replace(',', '.')}`;
 
       // Append output
       outputDiv.innerHTML += `${line}\nBalance=${balanceFormat}\nBonus=R0.00\nWithdrawal=0\n\n`;
